@@ -594,20 +594,37 @@ function pageTopic(view, t) {
   let difficulty = 1;
   let set = [];
 
+  const worked = t.workedExample ? [1, 2, 3].filter((d) => t.workedExample[d]) : [];
   view.innerHTML = `
     <a class="back" href="#/practice">← All topics</a>
     <div class="page-head">
       <h1>${t.icon} ${esc(t.name)}</h1>
       <p>${esc(t.recap || t.blurb || "")}</p>
     </div>
-    ${t.diagram || t.example ? `
-      <details class="card" style="margin-bottom:16px;">
-        <summary>${t.diagram ? "Show diagram &amp; example" : "Show example"}</summary>
-        ${t.example ? `<p class="small" style="margin-top:10px;"><strong>Real-life example:</strong> ${esc(t.example)}</p>` : ""}
-        ${t.diagram ? `<div class="diagram-box">${t.diagram}</div>` : ""}
-        <div id="worked-example"></div>
-      </details>` : ""}
-    <div class="card">
+    <div class="segmented" id="tabs" style="margin-bottom:16px;">
+      <button type="button" data-tab="learn">📖 Learn</button>
+      <button type="button" data-tab="practice">✏️ Practice</button>
+    </div>
+
+    <div id="tab-learn" class="stack">
+      ${lessonHTML(t.id)}
+      ${t.example || t.diagram ? `
+        <div class="card lesson">
+          <h3>In real life</h3>
+          ${t.example ? `<p>${esc(t.example)}</p>` : ""}
+          ${t.diagram ? `<div class="diagram-box">${t.diagram}</div>` : ""}
+        </div>` : ""}
+      ${worked.length ? `
+        <div class="card lesson">
+          <h3>Worked examples</h3>
+          ${worked.map((d) => `
+            <p style="margin:14px 0 6px;"><span class="tag">${DIFF_NAMES[d]}</span> ${esc(t.workedExample[d].question)}</p>
+            <div class="explain" style="margin-top:0;">${esc(t.workedExample[d].walkthrough)}</div>`).join("")}
+        </div>` : ""}
+      <button class="btn block" type="button" id="go-practice">Start practising →</button>
+    </div>
+
+    <div class="card" id="tab-practice">
       <div class="row between" style="margin-bottom:18px;">
         <div class="segmented" id="diff">
           ${[1, 2, 3].map((d) => `<button type="button" data-d="${d}">${DIFF_NAMES[d]}</button>`).join("")}
@@ -620,20 +637,26 @@ function pageTopic(view, t) {
 
   $$("#diff button", view).forEach((b) => b.addEventListener("click", () => { difficulty = +b.dataset.d; newSet(); }));
 
+  function showTab(name) {
+    $$("#tabs button", view).forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+    $("#tab-learn", view).classList.toggle("hidden", name !== "learn");
+    $("#tab-practice", view).classList.toggle("hidden", name !== "practice");
+    if (name === "practice") $("#qset input", view)?.focus();
+  }
+  $$("#tabs button", view).forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  $("#go-practice", view).addEventListener("click", () => { showTab("practice"); window.scrollTo(0, 0); });
+
   function newSet() {
     $$("#diff button", view).forEach((b) => b.classList.toggle("active", +b.dataset.d === difficulty));
     const pool = t.questions.filter((q) => q.difficulty === difficulty);
     set = shuffle(pool).slice(0, PRACTICE_SET_SIZE);
     $("#pts-each", view).textContent = set.length ? `+${pointsFor(set[0], t)} pts each` : "";
-    const we = t.workedExample?.[difficulty];
-    const weBox = $("#worked-example", view);
-    if (weBox) weBox.innerHTML = we ? `<p class="small" style="margin-top:12px;"><strong>Worked example:</strong> ${esc(we.question)}</p><div class="explain">${esc(we.walkthrough)}</div>` : "";
 
     const form = $("#qset", view);
     if (!set.length) { form.innerHTML = `<p class="muted">No questions at this level yet — try another.</p>`; return; }
     form.innerHTML = set.map((q, i) => questionHTML(q, i)).join("") +
       `<div class="row" style="margin-top:18px;"><button class="btn" type="submit" id="check">Check answers</button></div>`;
-    $("input", form)?.focus();
+    if (!$("#tab-practice", view).classList.contains("hidden")) $("input", form)?.focus();
   }
 
   $("#qset", view).addEventListener("submit", (e) => {
@@ -661,6 +684,19 @@ function pageTopic(view, t) {
   });
 
   newSet();
+  showTab(topicStats(t.id).attempted ? "practice" : "learn");
+}
+
+// Renders a topic's lesson sections from TOPIC_LESSONS (js/lessons.js).
+function lessonHTML(topicId, { flat = false } = {}) {
+  const sections = (typeof TOPIC_LESSONS !== "undefined" && TOPIC_LESSONS[topicId]) || [];
+  return sections.map((sec) => `
+    <div class="${flat ? "lesson" : "card lesson"}">
+      <h3>${esc(sec.title)}</h3>
+      ${sec.text ? `<p>${esc(sec.text)}</p>` : ""}
+      ${sec.points ? `<ul>${sec.points.map((pt) => `<li>${esc(pt)}</li>`).join("")}</ul>` : ""}
+      ${sec.tip ? `<div class="tip">💡 ${esc(sec.tip)}</div>` : ""}
+    </div>`).join("");
 }
 
 function questionHTML(q, i, topicLabel = "") {
@@ -755,6 +791,11 @@ function pageWriting(view, t) {
   view.innerHTML = `
     <a class="back" href="#/practice">← All topics</a>
     <div class="page-head"><h1>${t.icon} ${esc(t.name)}</h1><p>${esc(t.recap || "")}</p></div>
+    ${lessonHTML(t.id) ? `
+      <details class="card" style="margin-bottom:16px;">
+        <summary>📖 How to write ${t.special === "essay-writing" ? "a strong essay" : "a great story"}</summary>
+        <div class="stack" style="margin-top:12px;">${lessonHTML(t.id, { flat: true })}</div>
+      </details>` : ""}
     <div id="writing"></div>`;
   const root = $("#writing", view);
 

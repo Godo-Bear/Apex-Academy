@@ -296,3 +296,9 @@ details[open] summary { margin-bottom: 4px; }
 
 .rank-card { display: flex; align-items: center; gap: 16px; }
 .rank-card .rank-icon { font-size: 34px; line-height: 1; }
+
+.lesson h3 { margin-bottom: 8px; }
+.lesson p { margin-bottom: 8px; }
+.lesson ul { margin: 0; padding-left: 20px; }
+.lesson li { margin: 4px 0; }
+.lesson .tip { margin-top: 10px; background: var(--accent-soft); color: var(--ink); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
