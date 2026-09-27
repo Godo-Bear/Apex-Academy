@@ -18,12 +18,12 @@ To add or edit questions, change `js/data.js`. Questions in the `custom_question
 
 ## Pages
 
-- **Home**: stats, a suggested next topic, shortcuts
+- **Home**: stats, XP rank, a suggested next topic, shortcuts
 - **Practice**: topic list → sets of 5 questions (Easy / Medium / Hard), explanations, AI step-by-step; creative and essay writing with a timer, auto-saved drafts and AI feedback
-- **Test**: pick topics, difficulty, question count and time limit, then review marked answers
+- **Test**: pick topics, difficulty, question count and time limit, then review marked answers. Optionally paste example questions and the AI writes a test in the same style (within the chosen topics, or based only on the examples)
 - **Tutor**: AI chat, with optional photo of working
-- **Progress**: mastery by topic, leaderboard (everyone / friends)
-- **Admin** (only for `is_admin` accounts): mark accounts paid for 6 months, revoke, read feedback
+- **Progress**: XP rank and rank list, mastery by topic, leaderboard (everyone / friends)
+- **Admin** (only for `is_admin` accounts): site stats; per account add/set points and XP, renew 6 months, make/remove admin, reset progress, kick/unkick, delete; reply to, resolve and clear feedback; bulk-import questions
 
 ## Running locally
 

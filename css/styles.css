@@ -285,7 +285,7 @@ details[open] summary { margin-bottom: 4px; }
 
 /* Modal */
 .modal { position: fixed; inset: 0; background: rgba(10, 15, 25, .45); display: grid; place-items: center; padding: 16px; z-index: 50; }
-.modal .card { width: 100%; max-width: 460px; }
+.modal .card { width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
 
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
@@ -293,3 +293,6 @@ details[open] summary { margin-bottom: 4px; }
   font-weight: 600; font-size: 14px; z-index: 60;
 }
 @media (max-width: 760px) { .toast { bottom: 84px; } }
+
+.rank-card { display: flex; align-items: center; gap: 16px; }
+.rank-card .rank-icon { font-size: 34px; line-height: 1; }

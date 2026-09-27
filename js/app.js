@@ -14,6 +14,59 @@ const DIFF_POINTS = { 1: 10, 2: 20, 3: 30 };
 const DIFF_NAMES = { 1: "Easy", 2: "Medium", 3: "Hard" };
 const PRACTICE_SET_SIZE = 5;
 
+// XP ranks — XP is earned alongside points and never spent.
+const XP_LEVELS = [
+  { name: "Rookie", min: 0, icon: "🌱" },
+  { name: "Apprentice", min: 100, icon: "📘" },
+  { name: "Scholar", min: 300, icon: "🎓" },
+  { name: "Ace", min: 600, icon: "⭐" },
+  { name: "Master", min: 1000, icon: "🏅" },
+  { name: "Grandmaster", min: 2000, icon: "👑" },
+  { name: "Legend", min: 4000, icon: "💎" },
+];
+const ADMIN_RANK_ICON_SVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:1em; height:1em; vertical-align:-0.15em; overflow:visible;">
+  <defs>
+    <radialGradient id="inevGlow" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#FFF6D8" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#FFD34D" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#FFD34D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="inevGold" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFEBA8"/>
+      <stop offset="50%" stop-color="#F0B23A"/>
+      <stop offset="100%" stop-color="#B87A15"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="42" r="46" fill="url(#inevGlow)"/>
+  <g stroke="#FFD34D" stroke-width="2.5" stroke-linecap="round" opacity="0.7">
+    <line x1="50" y1="42" x2="50" y2="4"/>
+    <line x1="50" y1="42" x2="80" y2="14"/>
+    <line x1="50" y1="42" x2="96" y2="40"/>
+    <line x1="50" y1="42" x2="88" y2="68"/>
+    <line x1="50" y1="42" x2="20" y2="14"/>
+    <line x1="50" y1="42" x2="4" y2="40"/>
+    <line x1="50" y1="42" x2="12" y2="68"/>
+  </g>
+  <rect x="33" y="66" width="34" height="18" rx="5" fill="url(#inevGold)" stroke="#7A4E10" stroke-width="2.5"/>
+  <rect x="33" y="70" width="34" height="4" fill="#7A4E10" opacity="0.4"/>
+  <rect x="27" y="38" width="46" height="32" rx="12" fill="url(#inevGold)" stroke="#7A4E10" stroke-width="2.5"/>
+  <circle cx="37" cy="34" r="9" fill="url(#inevGold)" stroke="#7A4E10" stroke-width="2.5"/>
+  <circle cx="50" cy="30" r="10" fill="url(#inevGold)" stroke="#7A4E10" stroke-width="2.5"/>
+  <circle cx="63" cy="34" r="9" fill="url(#inevGold)" stroke="#7A4E10" stroke-width="2.5"/>
+  <path d="M22 46 Q14 44 14 54 Q14 63 24 64 L28 64 L28 46 Z" fill="url(#inevGold)" stroke="#7A4E10" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>`;
+const ADMIN_RANK = { name: "Inevitable", icon: ADMIN_RANK_ICON_SVG };
+
+function levelInfo(xp, isAdmin) {
+  if (isAdmin) return { current: ADMIN_RANK, next: null, pct: 100 };
+  let i = 0;
+  while (i + 1 < XP_LEVELS.length && xp >= XP_LEVELS[i + 1].min) i++;
+  const current = XP_LEVELS[i];
+  const next = XP_LEVELS[i + 1] || null;
+  const pct = next ? Math.round(((xp - current.min) / (next.min - current.min)) * 100) : 100;
+  return { current, next, pct };
+}
+
 const NAV = [
   { route: "home", label: "Home", icon: "🏠" },
   { route: "practice", label: "Practice", icon: "📚" },
@@ -144,11 +197,16 @@ function recordResults(results, { isTest = false } = {}) {
   // results: [{ q, topic, correct }]
   let earned = 0;
   results.forEach(({ q, topic, correct }) => {
-    const p = (me.progress[topic.id] ||= { correct: 0, attempted: 0 });
-    p.attempted += 1;
-    if (correct) { p.correct += 1; earned += pointsFor(q, topic); }
+    // AI-generated test questions have no topic id, so they earn points but don't count toward mastery.
+    if (topic.id) {
+      const p = (me.progress[topic.id] ||= { correct: 0, attempted: 0 });
+      p.attempted += 1;
+      if (correct) p.correct += 1;
+    }
+    if (correct) earned += pointsFor(q, topic);
   });
   me.points += earned;
+  me.xp += earned;
   if (isTest) me.testPoints += earned;
   bumpStreak();
   saveProgress();
@@ -160,7 +218,7 @@ let syncTimer = null;
 function saveProgress() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
-    const base = { points: me.points, progress: me.progress };
+    const base = { points: me.points, xp: me.xp, progress: me.progress };
     const { error } = await sb.from("profiles").update({ ...base, test_points: me.testPoints, last_seen: new Date().toISOString() }).eq("id", authUser.id);
     if (error) {
       console.error("Apex: full sync failed, retrying with core fields —", error);
@@ -194,6 +252,20 @@ $("#theme-toggle-m").addEventListener("click", toggleTheme);
 function openModal(name) {
   $$(".modal").forEach(hide);
   show($(`#modal-${name}`));
+  if (name === "feedback") loadMyFeedback();
+}
+
+// Shows the user's past messages and any admin replies inside the feedback modal.
+async function loadMyFeedback() {
+  const box = $("#my-feedback");
+  const { data, error } = await sb.from("feedback").select("*").eq("user_id", authUser.id).order("created_at", { ascending: false }).limit(10);
+  if (error || !data?.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="section-label" style="margin-top:8px;">Your messages</div>` + data.map((f) => `
+    <div class="list-row" style="display:block;">
+      <div class="row between"><span class="tag ${f.completed ? "good" : ""}">${f.completed ? "Resolved" : "Pending"}</span><span class="muted small">${new Date(f.created_at).toLocaleDateString()}</span></div>
+      <div class="small" style="margin-top:4px; white-space:pre-wrap;">${esc(f.message)}</div>
+      ${f.admin_reply ? `<div class="explain"><strong>Reply:</strong> ${esc(f.admin_reply)}</div>` : ""}
+    </div>`).join("");
 }
 document.addEventListener("click", (e) => {
   const opener = e.target.closest("[data-open]");
@@ -220,8 +292,8 @@ $("#feedback-send").addEventListener("click", async () => {
   btn.disabled = false;
   if (error) { console.error(error); return toast("Couldn't send — try again."); }
   $("#feedback-message").value = "";
-  hide($("#modal-feedback"));
   toast("Thanks — feedback sent!");
+  loadMyFeedback();
 });
 
 // ---------------- Auth ----------------
@@ -323,12 +395,12 @@ $("#paywall-recheck").addEventListener("click", async () => {
 async function handleAuthenticatedUser(user) {
   authUser = { id: user.id, email: user.email };
   let { data: profile, error } = await sb.from("profiles")
-    .select("username, has_paid, paid_until, points, test_points, progress, friends, is_admin")
+    .select("username, has_paid, paid_until, points, xp, test_points, progress, friends, is_admin")
     .eq("id", user.id).single();
   if (error && error.code !== "PGRST116") {
     // Older databases may not have test_points yet.
     ({ data: profile, error } = await sb.from("profiles")
-      .select("username, has_paid, paid_until, points, progress, friends, is_admin")
+      .select("username, has_paid, paid_until, points, xp, progress, friends, is_admin")
       .eq("id", user.id).single());
   }
   if (error?.code === "PGRST116") {
@@ -343,6 +415,7 @@ async function handleAuthenticatedUser(user) {
   me = {
     name: (profile.username || "").trim() || user.email.split("@")[0],
     points: profile.points || 0,
+    xp: profile.xp || 0,
     testPoints: profile.test_points || 0,
     progress: profile.progress || {},
     friends: profile.friends || [],
@@ -386,7 +459,9 @@ function enterApp() {
 
 function renderMeBox() {
   const line = `✦ ${me.points} pts · 🔥 ${currentStreak()}`;
+  const { current } = levelInfo(me.xp, me.isAdmin);
   $("#me-name").textContent = me.name;
+  $("#me-rank").innerHTML = `${current.icon} ${esc(current.name)} · ${me.xp} XP`;
   $("#me-stats").textContent = line;
   $("#me-stats-mobile").textContent = line;
 }
@@ -446,6 +521,7 @@ function pageHome(view) {
       ${statCard("Accuracy", t.accuracy + "%")}
       ${statCard("Day streak", currentStreak())}
     </div>
+    <div style="margin-top:12px;">${rankCard()}</div>
 
     <div class="section-label">Suggested next</div>
     <div class="card suggest">
@@ -464,6 +540,19 @@ function pageHome(view) {
     </div>
   `;
 }
+function rankCard() {
+  const { current, next, pct } = levelInfo(me.xp, me.isAdmin);
+  return `
+    <div class="card rank-card">
+      <span class="rank-icon">${current.icon}</span>
+      <div style="flex:1;">
+        <div class="row between"><strong>${esc(current.name)}</strong><span class="muted small">${me.xp} XP</span></div>
+        <div class="bar" style="margin:8px 0 4px;"><span style="width:${pct}%"></span></div>
+        <div class="muted small">${next ? `${next.min - me.xp} XP to ${next.icon} ${next.name}` : "Top rank reached"}</div>
+      </div>
+    </div>`;
+}
+
 const statCard = (label, value) => `<div class="card stat"><div class="label">${label}</div><div class="value">${value}</div></div>`;
 const quickCard = (href, icon, title, text) => `
   <a class="card topic-card" href="${href}">
@@ -787,6 +876,7 @@ function pageTest(view) {
   view.innerHTML = `
     <div class="page-head"><h1>Test</h1><p>Build a test from any topics. Questions are marked when you submit.</p></div>
     <div class="card stack" id="builder">
+      <div id="t-bank">
       <div>
         <div class="row between"><label class="field">Maths topics</label><button class="btn ghost sm" data-all="maths">Select all</button></div>
         <div class="checklist" data-group="maths">${checklist(MATHS_TOPICS)}</div>
@@ -800,6 +890,15 @@ function pageTest(view) {
         <div class="checklist" id="t-diff">
           ${[1, 2, 3].map((d) => `<label class="chip-check"><input type="checkbox" value="${d}" checked> ${DIFF_NAMES[d]}</label>`).join("")}
         </div>
+      </div>
+      </div>
+      <div>
+        <label class="field" for="t-examples">Example questions <span class="muted">(optional)</span></label>
+        <p class="muted small" style="margin-bottom:8px;">Paste one or more questions and the AI will write a fresh test in the same style. Leave blank to use the question bank.</p>
+        <textarea id="t-examples" rows="3" style="min-height:80px;" placeholder="e.g. What is 15% of 240?"></textarea>
+        <label class="small" style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+          <input type="checkbox" id="t-examples-only"> Base the whole test on my examples only (ignore the topics and difficulty above)
+        </label>
       </div>
       <div class="grid" style="grid-template-columns: 1fr 1fr;">
         <div><label class="field" for="t-count">Questions</label><input type="number" id="t-count" min="1" max="50" value="10"></div>
@@ -821,14 +920,44 @@ function pageTest(view) {
     btn.textContent = allOn ? "Select all" : "Clear";
   }));
 
-  $("#t-start", view).addEventListener("click", () => {
+  const examplesOnly = $("#t-examples-only", view);
+  examplesOnly.addEventListener("change", () => {
+    $("#t-bank", view).style.opacity = examplesOnly.checked ? ".4" : "";
+    $("#t-bank", view).style.pointerEvents = examplesOnly.checked ? "none" : "";
+  });
+
+  $("#t-start", view).addEventListener("click", async () => {
     const topicIds = $$("[data-group] input:checked", view).map((b) => b.value);
     const diffs = $$("#t-diff input:checked", view).map((b) => +b.value);
     const count = Math.max(1, Math.min(50, parseInt($("#t-count", view).value, 10) || 10));
     const minutes = +$("#t-time", view).value;
+    const examples = $("#t-examples", view).value.trim();
     const err = $("#t-error", view);
-    if (!topicIds.length) return setMsg(err, "Pick at least one topic.", "error");
-    if (!diffs.length) return setMsg(err, "Pick at least one difficulty.", "error");
+    hide(err);
+
+    if (examplesOnly.checked && !examples) return setMsg(err, "Type at least one example question.", "error");
+    if (!examplesOnly.checked) {
+      if (!topicIds.length) return setMsg(err, "Pick at least one topic.", "error");
+      if (!diffs.length) return setMsg(err, "Pick at least one difficulty.", "error");
+    }
+
+    if (examples) {
+      const btn = $("#t-start", view);
+      btn.disabled = true;
+      btn.textContent = "Writing your test…";
+      try {
+        const topics = examplesOnly.checked ? null : topicIds.map(findTopic);
+        const qs = await generateAIQuestions(examples, count, topics, diffs);
+        if (!qs.length) throw new Error("No usable questions");
+        runTest(view, qs.map((q) => ({ q, topic: { id: null, name: q.topicName, icon: "🤖" } })), minutes);
+      } catch (e) {
+        console.error("Apex: AI test generation failed —", e);
+        btn.disabled = false;
+        btn.textContent = "Start test →";
+        setMsg(err, "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank.", "error");
+      }
+      return;
+    }
 
     const pool = topicIds.flatMap((id) => {
       const topic = findTopic(id);
@@ -837,6 +966,60 @@ function pageTest(view) {
     if (!pool.length) return setMsg(err, "No questions match those choices.", "error");
     runTest(view, shuffle(pool).slice(0, count), minutes);
   });
+}
+
+// Asks the tutor for new questions modelled on the student's examples.
+// With topics: stays within those topics/difficulties. Without: matches the examples' own subject and level.
+async function generateAIQuestions(examples, count, topics, diffs) {
+  const rules = `Each question must have ONE short, clearly correct answer (a word, number, phrase, or short mark/symbol) — not an open-ended or essay-style answer, since answers are checked by exact text match.
+
+Respond with ONLY a valid JSON array, no other text, no markdown code fences, in exactly this format:
+[{"prompt": "question text", "answer": "the answer", "explanation": "a one-sentence explanation of the answer", "difficulty": 1, "topicName": "the topic"}]`;
+
+  const prompt = topics
+    ? `You are writing exam questions for a Year 7 Australian curriculum test covering these topics: ${topics.map((t) => t.name).join(", ")}.
+Difficulty level(s) to write at: ${diffs.map((d) => DIFF_NAMES[d].toLowerCase()).join("/")}.
+
+Here are example questions to match the style and structure of:
+"""
+${examples}
+"""
+
+Write exactly ${count} new original questions in that same style, spread across the topics listed above and matching the requested difficulty level(s). Set topicName to whichever listed topic each question belongs to, and difficulty to 1 for easy, 2 for medium, or 3 for hard.
+
+${rules}`
+    : `You are writing exam questions based on example questions a student has given you:
+"""
+${examples}
+"""
+
+First, work out what subject/topic these questions belong to and what level they are pitched at — judge this from the questions themselves, not from any assumed year level, and match that same level.
+
+Then write exactly ${count} new original questions on that same subject, at that same level, in a similar style and structure. Set topicName to the subject you identified, and difficulty to 1 (easier than the examples), 2 (about the same) or 3 (harder).
+
+${rules}`;
+
+  const raw = (await askTutor(prompt)).replace(/```json/gi, "").replace(/```/g, "");
+  const start = raw.indexOf("[");
+  const end = raw.lastIndexOf("]");
+  if (start === -1 || end < start) throw new Error("Unexpected AI response");
+  const stamp = Date.now();
+  return JSON.parse(raw.slice(start, end + 1))
+    .filter((q) => q && q.prompt && q.answer !== undefined && q.answer !== null && String(q.answer).trim() !== "")
+    .slice(0, count)
+    .map((q, i) => {
+      const answer = String(q.answer).trim();
+      const numeric = /^-?\d+(\.\d+)?$/.test(answer);
+      return {
+        id: `ai-${stamp}-${i}`,
+        prompt: String(q.prompt).trim(),
+        answer: numeric ? parseFloat(answer) : answer,
+        answerType: numeric ? undefined : "text",
+        explanation: q.explanation || "",
+        difficulty: [1, 2, 3].includes(Number(q.difficulty)) ? Number(q.difficulty) : 2,
+        topicName: String(q.topicName || "AI question"),
+      };
+    });
 }
 
 function runTest(view, items, minutes) {
@@ -1011,6 +1194,20 @@ function pageProgress(view) {
       ${statCard("Accuracy", t.accuracy + "%")}
       ${statCard("Answered", t.attempted)}
     </div>
+    <div style="margin-top:12px;">${rankCard()}</div>
+
+    <div class="section-label">Ranks</div>
+    <div class="card">
+      ${XP_LEVELS.map((l) => {
+        const reached = me.xp >= l.min;
+        const isCurrent = !me.isAdmin && levelInfo(me.xp).current === l;
+        return `<div class="list-row ${isCurrent ? "me" : ""}" style="${reached ? "" : "opacity:.55;"}">
+          <span style="font-size:20px;">${l.icon}</span>
+          <span class="grow">${l.name}${isCurrent ? " (you)" : ""}</span>
+          <span class="muted small">${l.min} XP</span>
+        </div>`;
+      }).join("")}
+    </div>
 
     <div class="section-label">Mastery by topic</div>
     <div class="card">
@@ -1095,88 +1292,246 @@ function pageProgress(view) {
 }
 
 // ---------------- Admin ----------------
+function timeAgo(iso) {
+  if (!iso) return "never";
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  if (mins < 1440) return `${Math.round(mins / 60)} hr ago`;
+  const days = Math.round(mins / 1440);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+const attemptedOf = (progress) => Object.values(progress || {}).reduce((n, t) => n + (t.attempted || 0), 0);
+
 function pageAdmin(view) {
   if (!me.isAdmin) { location.hash = "#/home"; return; }
   view.innerHTML = `
-    <div class="page-head"><h1>Admin</h1><p>Manage accounts and read feedback.</p></div>
+    <div class="page-head"><h1>Admin</h1><p>Manage accounts, feedback and questions.</p></div>
+    <div class="grid cols-3" id="admin-stats"></div>
+
     <div class="section-label">Accounts</div>
     <div class="card">
       <input type="text" id="acct-search" placeholder="Search name or email" style="margin-bottom:10px;">
       <div id="accts"><p class="muted">Loading…</p></div>
     </div>
-    <div class="section-label">Feedback</div>
-    <div class="card"><div id="fb-list"><p class="muted">Loading…</p></div></div>`;
 
+    <div class="section-label row between" style="margin-bottom:10px;">
+      <span>Feedback</span><button class="btn ghost sm" id="fb-clear">Clear all</button>
+    </div>
+    <div class="card"><div id="fb-list"><p class="muted">Loading…</p></div></div>
+
+    <div class="section-label">Import questions</div>
+    <div class="card stack">
+      <p class="small muted" style="margin:0;">Paste rows from a spreadsheet (comma or tab separated), one question per line:
+        <code>subject, topic_id, prompt, answer, explanation, difficulty</code>. Subject is <code>maths</code> or <code>english</code>; difficulty is 1, 2 or 3.</p>
+      <details><summary>Topic IDs</summary>
+        <div class="small muted" style="margin-top:6px;">${QUIZ_TOPICS.map((t) => `<code>${t.id}</code> ${esc(t.name)}`).join("<br>")}</div>
+      </details>
+      <textarea id="import-text" style="font-family:monospace; font-size:13px;" placeholder="maths,y7-computation,What is 12 + 8?,20,Add the ones then the tens.,1"></textarea>
+      <div class="row"><button class="btn" id="import-btn">Import</button><span class="small muted" id="import-status"></span></div>
+      <div id="import-errors" class="small error"></div>
+    </div>`;
+
+  // ----- Accounts -----
   let accounts = [];
-  const paidLabel = (a) => {
+  const open = new Set(); // account ids with their action panel expanded
+
+  function statusTag(a) {
+    if (a.deleted) return `<span class="tag bad">Deleted</span>`;
     if (!a.has_paid) return `<span class="tag bad">Not paid</span>`;
     if (!a.paid_until) return `<span class="tag good">Paid</span>`;
     const until = new Date(a.paid_until);
     return until > new Date()
       ? `<span class="tag good">Paid until ${until.toLocaleDateString()}</span>`
       : `<span class="tag bad">Expired ${until.toLocaleDateString()}</span>`;
-  };
+  }
+
+  function drawStats() {
+    const live = accounts.filter((a) => !a.deleted);
+    $("#admin-stats", view).innerHTML =
+      statCard("Accounts", live.length) +
+      statCard("Points awarded", live.reduce((n, a) => n + (a.points || 0), 0)) +
+      statCard("Questions answered", live.reduce((n, a) => n + attemptedOf(a.progress), 0));
+  }
 
   function drawAccounts() {
     const q = $("#acct-search", view).value.trim().toLowerCase();
     const list = accounts.filter((a) => !q || (a.username || "").toLowerCase().includes(q) || (a.email || "").toLowerCase().includes(q));
-    $("#accts", view).innerHTML = list.length ? list.map((a) => `
-      <div class="list-row">
-        <div class="grow"><strong>${esc(a.username || "(no name)")}</strong>${a.is_admin ? ` <span class="tag">admin</span>` : ""}<div class="muted small">${esc(a.email)} · ${a.points || 0} pts</div></div>
-        ${paidLabel(a)}
-        <button class="btn secondary sm" data-pay="${a.id}">+6 months</button>
-        ${a.has_paid ? `<button class="btn ghost sm" data-revoke="${a.id}">Revoke</button>` : ""}
-      </div>`).join("") : `<p class="muted">No accounts found.</p>`;
+    $("#accts", view).innerHTML = list.length ? list.map((a) => {
+      const isMe = a.id === authUser.id;
+      const btn = (act, label, cls = "secondary") => `<button class="btn ${cls} sm" data-act="${act}" data-id="${a.id}">${label}</button>`;
+      return `
+        <div class="list-row" style="${a.deleted ? "opacity:.5;" : ""}">
+          <div class="grow">
+            <strong>${esc(a.username || "(no name)")}</strong>${isMe ? " (you)" : ""}${a.is_admin ? ` <span class="tag">admin</span>` : ""}
+            <div class="muted small">${esc(a.email)} · ${a.points || 0} pts · ${a.xp || 0} XP · ${attemptedOf(a.progress)} answered · seen ${timeAgo(a.last_seen)}</div>
+          </div>
+          ${statusTag(a)}
+          <button class="btn ghost sm" data-toggle="${a.id}">${open.has(a.id) ? "Close" : "Manage"}</button>
+          ${open.has(a.id) ? `
+            <div class="row" style="flex-basis:100%; gap:6px;">
+              ${btn("add-points", "+10 pts")}${btn("set-points", "Set pts…")}
+              ${btn("add-xp", "+10 XP")}${btn("set-xp", "Set XP…")}
+              ${btn("renew", "Renew 6 months")}
+              ${btn("toggle-admin", a.is_admin ? "Remove admin" : "Make admin")}
+              ${btn("reset", "Reset progress")}
+              ${isMe ? "" : btn("kick", a.has_paid ? "Kick" : "Unkick", "ghost")}
+              ${isMe ? "" : btn("delete", "Delete account", "ghost")}
+            </div>` : ""}
+        </div>`;
+    }).join("") : `<p class="muted">No accounts found.</p>`;
   }
   $("#acct-search", view).addEventListener("input", drawAccounts);
 
+  const sixMonthsFrom = (d) => { const x = new Date(d); x.setMonth(x.getMonth() + 6); return x.toISOString(); };
+  const askNumber = (label) => {
+    const val = prompt(label);
+    if (val === null) return null;
+    const n = parseInt(val, 10);
+    if (isNaN(n)) { alert("Please enter a whole number."); return null; }
+    return n;
+  };
+
   $("#accts", view).addEventListener("click", async (e) => {
-    const pay = e.target.closest("[data-pay]");
-    const revoke = e.target.closest("[data-revoke]");
-    if (!pay && !revoke) return;
-    const id = (pay || revoke).dataset.pay || (pay || revoke).dataset.revoke;
-    const acct = accounts.find((a) => a.id === id);
-    let update;
-    if (pay) {
-      // Extend from the later of today or the current expiry.
-      const start = acct.paid_until && new Date(acct.paid_until) > new Date() ? new Date(acct.paid_until) : new Date();
-      start.setMonth(start.getMonth() + 6);
-      update = { has_paid: true, paid_until: start.toISOString() };
-    } else {
-      if (!confirm(`Revoke access for ${acct.username || acct.email}?`)) return;
-      update = { has_paid: false };
+    const toggle = e.target.closest("[data-toggle]");
+    if (toggle) {
+      const id = toggle.dataset.toggle;
+      open.has(id) ? open.delete(id) : open.add(id);
+      return drawAccounts();
     }
-    const { error } = await sb.from("profiles").update(update).eq("id", id);
-    if (error) return toast("Update failed.");
-    Object.assign(acct, update);
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const a = accounts.find((x) => x.id === btn.dataset.id);
+    const name = a.username || a.email;
+    // Your own row may be stale if you've practised since this page loaded.
+    if (a.id === authUser.id) { a.points = me.points; a.xp = me.xp; }
+    let update = null;
+
+    switch (btn.dataset.act) {
+      case "add-points": update = { points: (a.points || 0) + 10 }; break;
+      case "set-points": { const n = askNumber(`Set points for ${name}:`); if (n !== null) update = { points: n }; break; }
+      case "add-xp": update = { xp: (a.xp || 0) + 10 }; break;
+      case "set-xp": { const n = askNumber(`Set XP for ${name}:`); if (n !== null) update = { xp: n }; break; }
+      case "renew": {
+        // Extend from the later of today or the current expiry.
+        const from = a.paid_until && new Date(a.paid_until) > new Date() ? a.paid_until : new Date();
+        const until = sixMonthsFrom(from);
+        if (confirm(`Renew ${name} until ${new Date(until).toLocaleDateString()}?`)) update = { has_paid: true, paid_until: until, deleted: false };
+        break;
+      }
+      case "toggle-admin":
+        if (confirm(`${a.is_admin ? "Remove admin from" : "Make admin:"} ${name}?`)) update = { is_admin: !a.is_admin };
+        break;
+      case "reset":
+        if (confirm(`Reset all points and progress for ${name}? This can't be undone.`)) update = { points: 0, progress: {} };
+        break;
+      case "kick":
+        if (confirm(`${a.has_paid ? "Suspend" : "Reinstate"} ${name}?`)) update = a.has_paid ? { has_paid: false } : { has_paid: true, paid_until: sixMonthsFrom(new Date()) };
+        break;
+      case "delete":
+        if (!confirm(`Delete ${name}'s account? They'll be removed from the leaderboard and lose access.`)) break;
+        if (prompt(`To confirm, type "${name}" exactly:`) !== name) { alert("Name didn't match — nothing was deleted."); break; }
+        update = { deleted: true, has_paid: false, is_admin: false };
+        break;
+    }
+    if (!update) return;
+
+    btn.disabled = true;
+    const { error } = await sb.from("profiles").update(update).eq("id", a.id);
+    if (error) { btn.disabled = false; return alert(`Couldn't update ${name}: ${error.message}`); }
+    Object.assign(a, update);
+    if (a.id === authUser.id) {
+      if ("points" in update) me.points = update.points;
+      if ("xp" in update) me.xp = update.xp;
+      if ("progress" in update) me.progress = {};
+      if ("is_admin" in update) { me.isAdmin = update.is_admin; return enterApp(); }
+      renderMeBox();
+    }
+    drawStats();
     drawAccounts();
   });
 
   (async () => {
-    const { data, error } = await sb.from("profiles").select("id, username, email, points, has_paid, paid_until, is_admin, deleted").order("username");
+    let { data, error } = await sb.from("profiles").select("id, username, email, points, xp, has_paid, paid_until, is_admin, progress, last_seen, deleted");
+    if (error) ({ data, error } = await sb.from("profiles").select("id, username, email, points, xp, has_paid, paid_until, is_admin, progress"));
     if (error) { $("#accts", view).innerHTML = `<p class="muted">Couldn't load accounts.</p>`; return; }
-    accounts = (data || []).filter((a) => !a.deleted);
+    accounts = (data || []).sort((x, y) => (!!x.deleted - !!y.deleted) || (y.points || 0) - (x.points || 0));
+    drawStats();
     drawAccounts();
   })();
 
-  (async () => {
-    const { data, error } = await sb.from("feedback").select("*").order("created_at", { ascending: false });
+  // ----- Feedback -----
+  async function loadFeedback() {
     const box = $("#fb-list", view);
+    const { data, error } = await sb.from("feedback").select("*").order("created_at", { ascending: false });
     if (error) { box.innerHTML = `<p class="muted">Couldn't load feedback.</p>`; return; }
     if (!data.length) { box.innerHTML = `<p class="muted">No feedback yet.</p>`; return; }
     box.innerHTML = data.map((f) => `
-      <div class="list-row" style="align-items:flex-start;">
+      <div class="list-row" style="align-items:flex-start; ${f.completed ? "opacity:.6;" : ""}">
         <input type="checkbox" data-done="${f.id}" ${f.completed ? "checked" : ""} title="Mark done" style="margin-top:4px;">
         <div class="grow">
           <div><span class="tag">${esc(f.category)}</span> <strong>${esc(f.username)}</strong> <span class="muted small">${new Date(f.created_at).toLocaleString()}</span></div>
           <div style="white-space:pre-wrap; margin-top:4px;">${esc(f.message)}</div>
+          ${f.admin_reply ? `<div class="explain"><strong>Your reply:</strong> ${esc(f.admin_reply)}</div>` : ""}
+          <div class="row" style="flex-wrap:nowrap; margin-top:8px;">
+            <input type="text" data-reply-input="${f.id}" placeholder="${f.admin_reply ? "Update your reply…" : "Write a reply…"}">
+            <button class="btn secondary sm" data-reply="${f.id}">Reply</button>
+          </div>
         </div>
       </div>`).join("");
-    $$("[data-done]", box).forEach((cb) => cb.addEventListener("change", async () => {
-      const { error: err } = await sb.from("feedback").update({ completed: cb.checked }).eq("id", cb.dataset.done);
-      if (err) { cb.checked = !cb.checked; toast("Update failed."); }
-    }));
-  })();
+  }
+  $("#fb-list", view).addEventListener("change", async (e) => {
+    const cb = e.target.closest("[data-done]");
+    if (!cb) return;
+    const { error } = await sb.from("feedback").update({ completed: cb.checked }).eq("id", cb.dataset.done);
+    if (error) { cb.checked = !cb.checked; return toast("Update failed."); }
+    loadFeedback();
+  });
+  $("#fb-list", view).addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-reply]");
+    if (!btn) return;
+    const text = $(`[data-reply-input="${btn.dataset.reply}"]`, view).value.trim();
+    if (!text) return toast("Write a reply first.");
+    btn.disabled = true;
+    const { error } = await sb.from("feedback").update({ admin_reply: text, replied_at: new Date().toISOString() }).eq("id", btn.dataset.reply);
+    if (error) { btn.disabled = false; return toast("Couldn't send reply."); }
+    toast("Reply sent");
+    loadFeedback();
+  });
+  $("#fb-clear", view).addEventListener("click", async () => {
+    if (!confirm("Delete all feedback? This can't be undone.")) return;
+    const { error } = await sb.from("feedback").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if (error) return toast("Couldn't clear feedback.");
+    loadFeedback();
+  });
+  loadFeedback();
+
+  // ----- Bulk import -----
+  $("#import-btn", view).addEventListener("click", async () => {
+    const status = $("#import-status", view);
+    const errBox = $("#import-errors", view);
+    const rows = [];
+    const errors = [];
+    $("#import-text", view).value.split("\n").map((l) => l.trim()).filter(Boolean).forEach((line, i) => {
+      const parts = line.split(line.includes("\t") ? "\t" : ",").map((x) => x.trim());
+      const [subject, topic_id, prompt, answer, explanation, diff] = parts;
+      const difficulty = parseInt(diff, 10);
+      if (parts.length < 6) return errors.push(`Line ${i + 1}: needs 6 columns, found ${parts.length}.`);
+      if (!["maths", "english"].includes(subject)) return errors.push(`Line ${i + 1}: subject must be maths or english.`);
+      if (!QUIZ_TOPICS.some((t) => t.id === topic_id)) return errors.push(`Line ${i + 1}: unknown topic_id "${topic_id}".`);
+      if (![1, 2, 3].includes(difficulty)) return errors.push(`Line ${i + 1}: difficulty must be 1, 2 or 3.`);
+      if (!prompt || !answer) return errors.push(`Line ${i + 1}: prompt and answer can't be empty.`);
+      rows.push({ subject, topic_id, prompt, answer, explanation: explanation || "", difficulty, created_by: authUser.id });
+    });
+    errBox.innerHTML = errors.map(esc).join("<br>");
+    if (!rows.length) { status.textContent = "No valid rows to import."; return; }
+    status.textContent = `Importing ${rows.length}…`;
+    const { error } = await sb.from("custom_questions").insert(rows);
+    if (error) { console.error(error); status.textContent = "Import failed — see the browser console."; return; }
+    status.textContent = `Imported ${rows.length} question${rows.length === 1 ? "" : "s"}.`;
+    $("#import-text", view).value = "";
+    loadCustomQuestions();
+  });
 }
 
 // ---------------- Start ----------------
