@@ -602,7 +602,7 @@ function pageTopic(view, t) {
     </div>
     ${t.diagram || t.example ? `
       <details class="card" style="margin-bottom:16px;">
-        <summary>Show diagram &amp; example</summary>
+        <summary>${t.diagram ? "Show diagram &amp; example" : "Show example"}</summary>
         ${t.example ? `<p class="small" style="margin-top:10px;"><strong>Real-life example:</strong> ${esc(t.example)}</p>` : ""}
         ${t.diagram ? `<div class="diagram-box">${t.diagram}</div>` : ""}
         <div id="worked-example"></div>
