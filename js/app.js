@@ -648,14 +648,21 @@ function pageTopic(view, t) {
 
   function newSet() {
     $$("#diff button", view).forEach((b) => b.classList.toggle("active", +b.dataset.d === difficulty));
-    const pool = t.questions.filter((q) => q.difficulty === difficulty);
-    set = shuffle(pool).slice(0, PRACTICE_SET_SIZE);
+    set = nextPracticeSet(t, difficulty);
     $("#pts-each", view).textContent = set.length ? `+${pointsFor(set[0], t)} pts each` : "";
 
     const form = $("#qset", view);
     if (!set.length) { form.innerHTML = `<p class="muted">No questions at this level yet — try another.</p>`; return; }
     form.innerHTML = set.map((q, i) => questionHTML(q, i)).join("") +
-      `<div class="row" style="margin-top:18px;"><button class="btn" type="submit" id="check">Check answers</button></div>`;
+      `<div class="row" style="margin-top:18px;">
+        <button class="btn" type="submit" id="check">Check answers</button>
+        <button class="btn secondary" type="button" id="skip-set">New set ↻</button>
+      </div>`;
+    $("#skip-set", form).addEventListener("click", () => {
+      const typed = $$("input", form).some((i) => i.value.trim());
+      if (typed && !confirm("Get new questions? Your answers here won't be checked.")) return;
+      newSet();
+    });
     if (!$("#tab-practice", view).classList.contains("hidden")) $("input", form)?.focus();
   }
 
@@ -685,6 +692,31 @@ function pageTopic(view, t) {
 
   newSet();
   showTab(topicStats(t.id).attempted ? "practice" : "learn");
+}
+
+// Deals practice questions like a shuffled deck: every question at a difficulty
+// is shown once before any repeats. The deck is remembered on this device.
+function nextPracticeSet(t, difficulty) {
+  const pool = t.questions.filter((q) => q.difficulty === difficulty);
+  const key = `apex-deck-${authUser.id}`;
+  const decks = store(key) || {};
+  const deckId = `${t.id}-${difficulty}`;
+  const ids = new Set(pool.map((q) => q.id));
+  let deck = (decks[deckId] || []).filter((id) => ids.has(id));
+  const set = [];
+  while (set.length < Math.min(PRACTICE_SET_SIZE, pool.length)) {
+    if (!deck.length) {
+      // Reshuffle, keeping this set's questions out of the start of the new deck.
+      const taken = new Set(set.map((q) => q.id));
+      deck = shuffle(pool.filter((q) => !taken.has(q.id)).map((q) => q.id));
+      if (!deck.length) break;
+    }
+    const id = deck.shift();
+    set.push(pool.find((q) => q.id === id));
+  }
+  decks[deckId] = deck;
+  store(key, decks);
+  return set;
 }
 
 // Renders a topic's lesson sections from TOPIC_LESSONS (js/lessons.js).
