@@ -302,3 +302,17 @@ details[open] summary { margin-bottom: 4px; }
 .lesson ul { margin: 0; padding-left: 20px; }
 .lesson li { margin: 4px 0; }
 .lesson .tip { margin-top: 10px; background: var(--accent-soft); color: var(--ink); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+
+.settings-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.planner-part + .planner-part { margin-top: 16px; }
+.planner-part textarea { min-height: 110px; line-height: 1.6; }
+
+.side-pick { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.side-pick .btn { min-width: 150px; padding: 14px 20px; font-size: 16px; }
+.evidence { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.ev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+@media (max-width: 760px) { .ev-grid { grid-template-columns: 1fr; } }
+.ev-col { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.ev-col.mine { background: var(--accent-soft); outline: 2px solid var(--accent); }
+.ev-col ol { margin: 6px 0 0; padding-left: 20px; }
+.ev-col li { margin: 4px 0; }

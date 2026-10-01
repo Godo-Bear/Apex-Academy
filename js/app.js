@@ -778,9 +778,79 @@ Break the solution into short numbered steps a Year 7 student could follow easil
   }));
 }
 
+// ---------------- Saved writing ----------------
+// Pieces are always kept on this device. If the Supabase `writings` table exists
+// (see supabase/writings.sql) they're saved there too, so they follow the student
+// between devices.
+let cloudWritings = true;
+const writingsKey = () => `apex-writings-${authUser.id}`;
+const localWritings = () => store(writingsKey()) || [];
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : "w-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+
+function writingText(piece) {
+  return piece.parts ? piece.parts.map((p) => p.trim()).filter(Boolean).join("\n\n") : piece.text || "";
+}
+const countWords = (text) => (text.trim() ? text.trim().split(/\s+/).length : 0);
+
+function putLocalWriting(piece) {
+  store(writingsKey(), [piece, ...localWritings().filter((p) => p.id !== piece.id)].slice(0, 200));
+}
+
+async function saveWriting(piece) {
+  piece.updatedAt = new Date().toISOString();
+  piece.text = writingText(piece);
+  putLocalWriting(piece);
+  if (!cloudWritings) return;
+  const { error } = await sb.from("writings").upsert({
+    id: piece.id, user_id: authUser.id, topic_id: piece.topicId, prompt: piece.prompt,
+    text: piece.text, parts: piece.parts || null, settings: { ...piece.settings, evidence: piece.evidence || null }, feedback: piece.feedback || null,
+    word_count: countWords(piece.text), created_at: piece.createdAt, updated_at: piece.updatedAt,
+  });
+  if (error) { cloudWritings = false; console.warn("Apex: writings table unavailable, saving on this device only —", error.message); }
+}
+
+async function listWritings(topicId) {
+  const byId = new Map(localWritings().map((p) => [p.id, p]));
+  if (cloudWritings) {
+    const { data, error } = await sb.from("writings").select("*").eq("user_id", authUser.id);
+    if (error) cloudWritings = false;
+    else (data || []).forEach((r) => {
+      const local = byId.get(r.id);
+      if (local && local.updatedAt >= r.updated_at) return;
+      byId.set(r.id, {
+        id: r.id, topicId: r.topic_id, prompt: r.prompt, text: r.text, parts: r.parts || undefined,
+        settings: r.settings || {}, evidence: r.settings?.evidence || undefined,
+        feedback: r.feedback || "", createdAt: r.created_at, updatedAt: r.updated_at,
+      });
+    });
+  }
+  const all = [...byId.values()].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  store(writingsKey(), all.slice(0, 200));
+  return topicId ? all.filter((p) => p.topicId === topicId) : all;
+}
+
+async function deleteWriting(id) {
+  store(writingsKey(), localWritings().filter((p) => p.id !== id));
+  if (cloudWritings) await sb.from("writings").delete().eq("id", id);
+}
+
 // ---------------- Writing (creative + essay) ----------------
-const WRITING_FEEDBACK = {
-  "creative-writing": (prompt, text) => `You are an encouraging Year 7 English teacher marking a piece of creative writing. The writing prompt was: "${prompt}"
+const ESSAY_TYPES = {
+  persuasive: { label: "Persuasive", hint: "argue for one side" },
+  discussion: { label: "Discussion", hint: "weigh up both sides" },
+  informative: { label: "Informative", hint: "explain a topic clearly" },
+};
+const DEFAULT_WRITING_SETTINGS = {
+  "essay-writing": { essayType: "persuasive", paragraphs: 3, target: 350, minutes: 20, planner: true },
+  "creative-writing": { target: 300, minutes: 10 },
+};
+
+function writingFeedbackPrompt(t, piece) {
+  const s = piece.settings || {};
+  const text = writingText(piece);
+  const target = s.target ? ` They were aiming for about ${s.target} words and wrote ${countWords(text)}.` : "";
+  if (t.special === "creative-writing") {
+    return `You are an encouraging Year 7 English teacher marking a piece of creative writing. The writing prompt was: "${piece.prompt}".${target}
 
 Here is the student's writing:
 """
@@ -795,8 +865,12 @@ Give feedback a teacher would give on a creative writing piece, covering:
 5. One or two things they did well, to be encouraging.
 6. One clear, specific suggestion for how to improve the piece overall.
 
-Keep it friendly, specific, and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.`,
-  "essay-writing": (prompt, text) => `You are an encouraging Year 7 English teacher marking a piece of essay writing. The essay prompt was: "${prompt}"
+Keep it friendly, specific, and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.`;
+  }
+  const type = ESSAY_TYPES[s.essayType] || ESSAY_TYPES.persuasive;
+  return `You are an encouraging Year 7 English teacher marking a piece of essay writing. The essay prompt was: "${piece.prompt}"
+
+The student chose to write a ${type.label.toLowerCase()} essay (${type.hint})${s.side === "for" ? ", arguing FOR the topic" : s.side === "against" ? ", arguing AGAINST the topic" : ""}, with an introduction, ${s.paragraphs || 3} body paragraph${s.paragraphs === 1 ? "" : "s"} and a conclusion.${target}
 
 Here is the student's essay:
 """
@@ -804,43 +878,85 @@ ${text}
 """
 
 Give feedback a teacher would give on an essay, covering:
-1. Structure — does it have a clear introduction, body paragraphs, and conclusion?
-2. Thesis/argument — is their position or main point clear and consistent throughout?
-3. Paragraphing — does each paragraph focus on one main idea, with topic sentences?
+1. Structure — did they follow the structure they chose (introduction, ${s.paragraphs || 3} body paragraph${s.paragraphs === 1 ? "" : "s"}, conclusion)?
+2. Thesis/argument — is their position or main point clear and consistent, and does it suit a ${type.label.toLowerCase()} essay?
+3. Paragraphing — does each paragraph focus on one main idea, with a topic sentence?
 4. Evidence and reasoning — do they support their points with examples or reasons, not just opinions?
 5. Punctuation, capital letters, and spelling — point out any clear errors with brief examples.
-6. Sentence variety and word choice — suggest a few stronger or more interesting words or sentence structures.
+6. Sentence variety and word choice — suggest a few stronger words or sentence structures.
 7. One or two things they did well, to be encouraging.
 8. One clear, specific suggestion for how to improve the essay overall.
 
-Keep it friendly, specific, and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.`,
-};
+Keep it friendly, specific, and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.`;
+}
 
 function pageWriting(view, t) {
-  const draftKey = `apex-draft-${authUser.id}-${t.id}`;
-  const defaultMins = t.special === "essay-writing" ? 20 : 10;
+  const isEssay = t.special === "essay-writing";
+  const settingsKey = `apex-writing-settings-${t.special}`;
+  const settings = { ...DEFAULT_WRITING_SETTINGS[t.special], ...(store(settingsKey) || {}) };
+
+  // One-time move of the old single draft into the saved-writing list.
+  const oldDraftKey = `apex-draft-${authUser.id}-${t.id}`;
+  const oldDraft = store(oldDraftKey);
+  if (oldDraft?.text) {
+    const now = new Date().toISOString();
+    saveWriting({ id: newId(), topicId: t.id, prompt: oldDraft.prompt, text: oldDraft.text, settings: { ...settings, planner: false }, createdAt: now });
+  }
+  if (oldDraft) store(oldDraftKey, null);
 
   view.innerHTML = `
     <a class="back" href="#/practice">← All topics</a>
     <div class="page-head"><h1>${t.icon} ${esc(t.name)}</h1><p>${esc(t.recap || "")}</p></div>
     ${lessonHTML(t.id) ? `
       <details class="card" style="margin-bottom:16px;">
-        <summary>📖 How to write ${t.special === "essay-writing" ? "a strong essay" : "a great story"}</summary>
+        <summary>📖 How to write ${isEssay ? "a strong essay" : "a great story"}</summary>
         <div class="stack" style="margin-top:12px;">${lessonHTML(t.id, { flat: true })}</div>
       </details>` : ""}
+    <div class="segmented" id="w-tabs" style="margin-bottom:16px;">
+      <button type="button" data-tab="new">✏️ New piece</button>
+      <button type="button" data-tab="mine">📁 My writing <span id="w-count"></span></button>
+    </div>
     <div id="writing"></div>`;
   const root = $("#writing", view);
+  const setTab = (name) => $$("#w-tabs button", view).forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  $$("#w-tabs button", view).forEach((b) => b.addEventListener("click", () => {
+    if (cleanup) { cleanup(); cleanup = null; }
+    b.dataset.tab === "new" ? setup() : mine();
+  }));
+  const refreshCount = async () => {
+    const n = (await listWritings(t.id)).length;
+    const el = $("#w-count", view);
+    if (el) el.textContent = n ? `(${n})` : "";
+  };
 
-  function choose() {
-    const draft = store(draftKey);
+  const option = (value, label, current) => `<option value="${value}" ${String(value) === String(current) ? "selected" : ""}>${label}</option>`;
+
+  // ----- Step 1: settings + prompt -----
+  function setup() {
+    setTab("new");
     root.innerHTML = `
-      ${draft?.text ? `
-        <div class="card suggest" style="margin-bottom:16px;">
-          <div><h3 style="margin:0;">Continue your draft</h3><div class="muted small">${esc(draft.prompt)}</div></div>
-          <button class="btn" id="resume">Continue →</button>
-        </div>` : ""}
       <div class="card stack">
-        <h3>Pick a prompt</h3>
+        <h3>1. Set it up</h3>
+        <div class="grid settings-grid">
+          ${isEssay ? `
+            <div><label class="field" for="s-type">Essay type</label>
+              <select id="s-type">${Object.entries(ESSAY_TYPES).map(([k, v]) => option(k, v.label, settings.essayType)).join("")}</select>
+              <div class="muted small" id="s-type-hint" style="margin-top:4px;"></div></div>
+            <div><label class="field" for="s-paras">Body paragraphs</label>
+              <select id="s-paras">${[1, 2, 3, 4, 5, 6].map((n) => option(n, n, settings.paragraphs)).join("")}</select></div>` : ""}
+          <div><label class="field" for="s-target">Target length</label>
+            <select id="s-target">${option(0, "No target", settings.target)}${[150, 250, 300, 350, 500, 750, 1000].map((n) => option(n, `${n} words`, settings.target)).join("")}</select></div>
+          <div><label class="field" for="s-mins">Timer</label>
+            <select id="s-mins">${option(0, "No timer", settings.minutes)}${[5, 10, 15, 20, 30, 45, 60].map((n) => option(n, `${n} minutes`, settings.minutes)).join("")}</select></div>
+        </div>
+        ${isEssay ? `
+          <label class="small" style="display:flex; gap:8px; align-items:center;">
+            <input type="checkbox" id="s-planner" ${settings.planner ? "checked" : ""}>
+            Use the paragraph planner (a separate box for the introduction, each body paragraph and the conclusion)
+          </label>` : ""}
+      </div>
+      <div class="card stack" style="margin-top:16px;">
+        <h3>2. Pick a prompt</h3>
         <div class="prompt-list">${t.prompts.map((p, i) => `<button type="button" data-i="${i}">${esc(p)}</button>`).join("")}</div>
         <div>
           <label class="field" for="own-prompt">Or write your own</label>
@@ -850,57 +966,215 @@ function pageWriting(view, t) {
           </div>
         </div>
       </div>`;
-    $("#resume", root)?.addEventListener("click", () => write(draft.prompt, draft.text));
-    $$(".prompt-list button", root).forEach((b) => b.addEventListener("click", () => write(t.prompts[+b.dataset.i], "")));
+
+    const readSettings = () => {
+      if (isEssay) {
+        settings.essayType = $("#s-type", root).value;
+        settings.paragraphs = +$("#s-paras", root).value;
+        settings.planner = $("#s-planner", root).checked;
+      }
+      settings.target = +$("#s-target", root).value;
+      settings.minutes = +$("#s-mins", root).value;
+      store(settingsKey, settings);
+    };
+    const drawTypeHint = () => {
+      const el = $("#s-type-hint", root);
+      if (el) el.textContent = `You ${ESSAY_TYPES[$("#s-type", root).value].hint}${$("#s-type", root).value === "persuasive" ? " — you'll pick for or against" : ""}.`;
+    };
+    $$("select, input[type=checkbox]", root).forEach((el) => el.addEventListener("change", () => { readSettings(); drawTypeHint(); }));
+    drawTypeHint();
+
+    const start = (prompt) => {
+      readSettings();
+      const s = { ...settings };
+      const piece = { id: newId(), topicId: t.id, prompt, settings: s, feedback: "", createdAt: new Date().toISOString() };
+      if (isEssay && s.planner) piece.parts = Array(s.paragraphs + 2).fill("");
+      else piece.text = "";
+      if (isEssay && s.essayType === "persuasive") return chooseSide(piece);
+      if (isEssay && s.essayType === "discussion") piece.settings.side = "both";
+      write(piece, { isNew: true });
+    };
+    $$(".prompt-list button", root).forEach((b) => b.addEventListener("click", () => start(t.prompts[+b.dataset.i])));
     $("#own-go", root).addEventListener("click", () => {
       const p = $("#own-prompt", root).value.trim();
-      if (p) write(p, "");
+      if (p) start(p);
     });
   }
 
-  function write(prompt, text) {
-    let secondsLeft = defaultMins * 60;
+  // ----- Persuasive essays: pick a side -----
+  function chooseSide(piece) {
+    root.innerHTML = `
+      <div class="card stack" style="text-align:center;">
+        <div class="writing-prompt">${esc(piece.prompt)}</div>
+        <p class="muted" style="margin:0;">Which side will you argue? You'll get 4 strong pieces of evidence for each side to help you plan.</p>
+        <div class="side-pick">
+          <button class="btn" data-side="for">👍 For</button>
+          <button class="btn secondary" data-side="against">👎 Against</button>
+        </div>
+        <button class="btn ghost" id="side-back">← Pick a different prompt</button>
+      </div>`;
+    $$("[data-side]", root).forEach((b) => b.addEventListener("click", () => {
+      piece.settings.side = b.dataset.side;
+      write(piece, { isNew: true });
+    }));
+    $("#side-back", root).addEventListener("click", setup);
+  }
+
+  // Asks the tutor for 4 pieces of evidence on each side of the prompt.
+  async function fetchEvidence(prompt) {
+    const raw = await askTutor(`A Year 7 student is writing an essay on this topic:
+"${prompt}"
+
+Give exactly 4 strong pieces of evidence FOR the statement/position and exactly 4 strong pieces of evidence AGAINST it. Each piece should be one or two sentences a Year 7 student can understand and use in a paragraph: a clear reason backed by a concrete example, fact or real-world situation. Only use well-known, accurate facts — don't invent statistics, studies or quotes. If the topic isn't really a for/against question, interpret "for" as supporting the main idea and "against" as challenging it.
+
+Respond with ONLY valid JSON, no other text, in exactly this format:
+{"for": ["...", "...", "...", "..."], "against": ["...", "...", "...", "..."]}`);
+    const json = raw.replace(/```json/gi, "").replace(/```/g, "");
+    const parsed = JSON.parse(json.slice(json.indexOf("{"), json.lastIndexOf("}") + 1));
+    const clean = (arr) => (Array.isArray(arr) ? arr.map((x) => String(x).trim()).filter(Boolean).slice(0, 4) : []);
+    const evidence = { for: clean(parsed.for), against: clean(parsed.against) };
+    if (!evidence.for.length || !evidence.against.length) throw new Error("Missing evidence");
+    return evidence;
+  }
+
+  // ----- Step 2: the editor -----
+  function write(piece, { isNew = false } = {}) {
+    setTab("new");
+    const s = piece.settings || {};
+    let secondsLeft = (s.minutes || 0) * 60;
     let timer = null;
+    let saveTimer = null;
+    let saved = !isNew;
+
+    const partLabel = (i, n) => (i === 0 ? "Introduction" : i === n - 1 ? "Conclusion" : `Body paragraph ${i}`);
+    const partHint = (i, n) => (i === 0
+      ? "Hook the reader, give some background, and state your main argument (thesis)."
+      : i === n - 1
+        ? "Restate your thesis in new words, sum up your points, and finish with a strong final thought."
+        : "Topic sentence → Explain → Evidence (an example or fact) → Link back to your thesis.");
+    const summary = [
+      isEssay ? `${(ESSAY_TYPES[s.essayType] || ESSAY_TYPES.persuasive).label} essay` : "",
+      isEssay ? `${s.paragraphs} body paragraph${s.paragraphs === 1 ? "" : "s"}` : "",
+      s.side === "for" ? "Arguing FOR" : s.side === "against" ? "Arguing AGAINST" : "",
+      s.target ? `aim for ${s.target} words` : "",
+    ].filter(Boolean);
+
     root.innerHTML = `
       <div class="card stack">
-        <div class="writing-prompt">${esc(prompt)}</div>
-        <div class="row between">
-          <div class="row">
-            <span class="timer" id="clock"></span>
-            <select id="mins" style="width:auto;">
-              ${[5, 10, 15, 20, 30, 45].map((m) => `<option value="${m}" ${m === defaultMins ? "selected" : ""}>${m} min</option>`).join("")}
-            </select>
-            <button class="btn secondary sm" id="clock-btn">Start timer</button>
-          </div>
-          <span class="muted small" id="words"></span>
+        <div>
+          <div class="writing-prompt">${esc(piece.prompt)}</div>
+          ${summary.length ? `<div class="row" style="gap:6px; margin-top:8px;">${summary.map((x) => `<span class="tag">${esc(x)}</span>`).join("")}</div>` : ""}
         </div>
-        <textarea class="editor" id="editor" placeholder="Start writing…"></textarea>
+        ${s.side ? `<details class="evidence" open><summary>🧾 Evidence bank</summary><div id="evidence"></div></details>` : ""}
         <div class="row between">
-          <button class="btn ghost" id="change">← Change prompt</button>
           <div class="row">
-            <button class="btn secondary" id="finish">Finish &amp; clear</button>
+            ${s.minutes ? `<span class="timer" id="clock"></span><button class="btn secondary sm" id="clock-btn">Start timer</button>` : ""}
+          </div>
+          <span class="muted small" id="save-state"></span>
+        </div>
+        <div id="editor-area">
+          ${piece.parts
+            ? piece.parts.map((_, i) => `
+                <div class="planner-part">
+                  <label class="field" for="part-${i}">${partLabel(i, piece.parts.length)}</label>
+                  <div class="muted small" style="margin-bottom:6px;">${partHint(i, piece.parts.length)}</div>
+                  <textarea id="part-${i}" data-part="${i}" rows="5"></textarea>
+                </div>`).join("")
+            : `<textarea class="editor" id="editor" placeholder="Start writing…"></textarea>`}
+        </div>
+        <div>
+          <div class="row between small"><span id="words"></span><span class="muted" id="target-note"></span></div>
+          ${s.target ? `<div class="bar" style="margin-top:6px;"><span id="target-bar"></span></div>` : ""}
+        </div>
+        <div class="row between">
+          <button class="btn ghost" id="back">← My writing</button>
+          <div class="row">
+            <button class="btn secondary" id="copy">Copy text</button>
             <button class="btn" id="get-fb">Get AI feedback</button>
           </div>
         </div>
-        <div id="fb" class="explain hidden"></div>
+        <div id="fb" class="explain ${piece.feedback ? "" : "hidden"}"></div>
       </div>`;
 
-    const editor = $("#editor", root);
-    editor.value = text;
+    const drawEvidence = (state) => {
+      const box = $("#evidence", root);
+      if (!box) return;
+      if (state === "loading") { box.innerHTML = `<p class="muted small">Finding evidence for both sides…</p>`; return; }
+      if (state === "error") {
+        box.innerHTML = `<p class="muted small">Couldn't load evidence right now. <button class="btn ghost sm" id="ev-retry">Try again</button></p>`;
+        $("#ev-retry", root).addEventListener("click", loadEvidence);
+        return;
+      }
+      const col = (side, title) => `
+        <div class="ev-col ${s.side === side ? "mine" : ""}">
+          <strong>${title}${s.side === side ? " — your side" : ""}</strong>
+          <ol>${piece.evidence[side].map((e) => `<li>${esc(e)}</li>`).join("")}</ol>
+        </div>`;
+      box.innerHTML = `<div class="ev-grid">${col("for", "👍 For")}${col("against", "👎 Against")}</div>
+        <p class="muted small" style="margin:8px 0 0;">Tip: use your side's evidence in your body paragraphs, and knock down the strongest point from the other side.</p>`;
+    };
+    async function loadEvidence() {
+      drawEvidence("loading");
+      try {
+        piece.evidence = await fetchEvidence(piece.prompt);
+        if (!document.body.contains(root)) return;
+        drawEvidence();
+        if (saved || countWords(writingText(piece))) saveNow();
+      } catch (err) {
+        console.error("Apex: evidence request failed —", err);
+        if (document.body.contains(root)) drawEvidence("error");
+      }
+    }
+
+    const boxes = piece.parts ? $$("[data-part]", root) : [$("#editor", root)];
+    if (piece.parts) boxes.forEach((b, i) => { b.value = piece.parts[i] || ""; });
+    else boxes[0].value = piece.text || "";
+    if (piece.feedback) $("#fb", root).textContent = piece.feedback;
+    boxes[0].focus();
+
+    const collect = () => {
+      if (piece.parts) piece.parts = boxes.map((b) => b.value);
+      else piece.text = boxes[0].value;
+    };
+    const drawWords = () => {
+      const n = countWords(writingText(piece));
+      $("#words", root).textContent = `${n} words`;
+      if (s.target) {
+        $("#target-note", root).textContent = n >= s.target ? "Target reached ✓" : `${s.target - n} to go`;
+        $("#target-bar", root).style.width = Math.min(100, Math.round((n / s.target) * 100)) + "%";
+      }
+    };
+    const saveState = (text) => { const el = $("#save-state", root); if (el) el.textContent = text; };
+    const saveNow = async () => {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      if (!countWords(writingText(piece)) && !piece.feedback) return; // don't save empty pieces
+      await saveWriting(piece);
+      saved = true;
+      saveState(cloudWritings ? "Saved ✓" : "Saved on this device ✓");
+      refreshCount();
+    };
+    drawWords();
+    saveState(saved ? "Saved ✓" : "");
+    if (s.side) piece.evidence ? drawEvidence() : loadEvidence();
+
+    boxes.forEach((b) => b.addEventListener("input", () => {
+      collect();
+      drawWords();
+      saveState("Saving…");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveNow, 800);
+    }));
+
     const clock = $("#clock", root);
-    const words = () => (editor.value.trim() ? editor.value.trim().split(/\s+/).length : 0);
     const drawClock = () => {
+      if (!clock) return;
       clock.textContent = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
       clock.classList.toggle("low", secondsLeft <= 60);
     };
-    const drawWords = () => { $("#words", root).textContent = `${words()} words`; };
-    const stop = () => { clearInterval(timer); timer = null; $("#clock-btn", root).textContent = "Start timer"; };
-    drawClock(); drawWords();
-    editor.focus();
-
-    editor.addEventListener("input", () => { drawWords(); store(draftKey, { prompt, text: editor.value }); });
-    $("#mins", root).addEventListener("change", (e) => { stop(); secondsLeft = +e.target.value * 60; drawClock(); });
-    $("#clock-btn", root).addEventListener("click", () => {
+    const stop = () => { clearInterval(timer); timer = null; const b = $("#clock-btn", root); if (b) b.textContent = "Start timer"; };
+    drawClock();
+    $("#clock-btn", root)?.addEventListener("click", () => {
       if (timer) return stop();
       $("#clock-btn", root).textContent = "Pause";
       timer = setInterval(() => {
@@ -909,17 +1183,15 @@ function pageWriting(view, t) {
         if (secondsLeft === 0) { stop(); toast("Time's up! Finish your sentence and get feedback."); }
       }, 1000);
     });
-    cleanup = stop;
+    cleanup = () => { stop(); if (saveTimer) saveNow(); };
 
-    $("#change", root).addEventListener("click", () => { stop(); choose(); });
-    $("#finish", root).addEventListener("click", () => {
-      if (editor.value.trim() && !confirm("Clear this piece and start fresh?")) return;
-      stop();
-      store(draftKey, null);
-      choose();
+    $("#back", root).addEventListener("click", async () => { cleanup(); cleanup = null; mine(); });
+    $("#copy", root).addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(writingText(piece)); toast("Copied to clipboard"); }
+      catch (e) { toast("Couldn't copy — select the text and copy it instead."); }
     });
     $("#get-fb", root).addEventListener("click", async () => {
-      if (words() < 15) return toast("Write a few more sentences first.");
+      if (countWords(writingText(piece)) < 15) return toast("Write a few more sentences first.");
       const btn = $("#get-fb", root);
       const box = $("#fb", root);
       btn.disabled = true;
@@ -927,17 +1199,56 @@ function pageWriting(view, t) {
       show(box);
       box.textContent = "Reading your writing…";
       try {
-        box.textContent = await askTutor(WRITING_FEEDBACK[t.special](prompt, editor.value.trim()));
+        piece.feedback = await askTutor(writingFeedbackPrompt(t, piece));
+        box.textContent = piece.feedback;
+        await saveNow();
       } catch (err) {
         console.error(err);
         box.textContent = "Couldn't get feedback right now — try again in a moment.";
       }
-      btn.disabled = false;
-      btn.textContent = "Get AI feedback";
+      if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = "Get AI feedback"; }
     });
   }
 
-  choose();
+  // ----- My writing list -----
+  async function mine() {
+    setTab("mine");
+    root.innerHTML = `<div class="card"><p class="muted">Loading…</p></div>`;
+    const pieces = await listWritings(t.id);
+    refreshCount();
+    if (!document.body.contains(root)) return;
+    if (!pieces.length) {
+      root.innerHTML = `<div class="card"><p class="muted" style="margin:0;">Nothing saved yet. Start a new piece and it will save here automatically.</p></div>`;
+      return;
+    }
+    root.innerHTML = `<div class="card">${pieces.map((p) => {
+      const s = p.settings || {};
+      const words = countWords(writingText(p));
+      const bits = [
+        new Date(p.updatedAt || p.createdAt).toLocaleDateString(),
+        `${words} word${words === 1 ? "" : "s"}${s.target ? ` / ${s.target}` : ""}`,
+        isEssay && s.essayType ? `${(ESSAY_TYPES[s.essayType] || {}).label}${s.side === "for" ? " (for)" : s.side === "against" ? " (against)" : ""} · ${s.paragraphs} body ¶` : "",
+      ].filter(Boolean);
+      return `
+        <div class="list-row">
+          <div class="grow">
+            <strong>${esc(p.prompt)}</strong>
+            <div class="muted small">${bits.map(esc).join(" · ")} ${p.feedback ? `<span class="tag good">Has feedback</span>` : ""}</div>
+          </div>
+          <button class="btn secondary sm" data-piece="${p.id}">Open</button>
+          <button class="btn ghost sm" data-del="${p.id}" title="Delete">Delete</button>
+        </div>`;
+    }).join("")}</div>`;
+    $$("[data-piece]", root).forEach((b) => b.addEventListener("click", () => write(pieces.find((p) => p.id === b.dataset.piece))));
+    $$("[data-del]", root).forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Delete this piece? This can't be undone.")) return;
+      await deleteWriting(b.dataset.del);
+      mine();
+    }));
+  }
+
+  refreshCount();
+  setup();
 }
 
 // ---------------- Test ----------------
