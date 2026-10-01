@@ -320,8 +320,8 @@ details[open] summary { margin-bottom: 4px; }
 .timer-box { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .timer-box .timer { min-width: 64px; }
 .stepper { display: flex; gap: 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
-.stepper span { padding: 4px 12px; border-radius: 999px; background: var(--surface-2); }
-.stepper span.on { background: var(--accent); color: var(--accent-ink); }
+.stepper button { border: 0; cursor: pointer; font: inherit; color: inherit; padding: 4px 12px; border-radius: 999px; background: var(--surface-2); }
+.stepper button.on { background: var(--accent); color: var(--accent-ink); cursor: default; }
 .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 .plan-grid textarea { min-height: 80px; }
 .plan-view { margin: 8px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; }

@@ -1210,8 +1210,18 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
       s.target ? `aim for ${s.target} words` : "",
     ].filter(Boolean).map((x) => `<span class="tag">${esc(x)}</span>`).join("");
   };
-  const stepper = (piece, active) => (piece.settings?.planMinutes || piece.plan && Object.keys(piece.plan).length
-    ? `<div class="stepper"><span class="${active === "plan" ? "on" : ""}">1. Plan</span><span class="${active === "write" ? "on" : ""}">2. Write</span></div>` : "");
+  // Plan / Write switcher shown on every piece, so older pieces can still be planned.
+  const stepper = (active) => `
+    <div class="stepper">
+      <button type="button" data-stage="plan" class="${active === "plan" ? "on" : ""}">1. Plan</button>
+      <button type="button" data-stage="write" class="${active === "write" ? "on" : ""}">2. Write</button>
+    </div>`;
+  const wireStepper = (piece, saver) => $$("[data-stage]", root).forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.stage === piece.stage) return;
+    piece.stage = b.dataset.stage;
+    saver.saveNow();
+    open(piece);
+  }));
 
   // ----- Stage 1: plan -----
   function planStage(piece, { isNew }) {
@@ -1221,7 +1231,7 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
     const fields = planFields(t, piece);
     root.innerHTML = `
       <div class="card stack">
-        ${stepper(piece, "plan")}
+        ${stepper("plan")}
         <div>
           <div class="writing-prompt">${esc(piece.prompt)}</div>
           <div class="row" style="gap:6px; margin-top:8px;">${summaryTags(piece)}</div>
@@ -1246,6 +1256,7 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
     const timer = makeTimer($("#timer-host", root), s.planMinutes || 5, { label: "Planning", doneMessage: "Planning time's up! Start writing when you're ready." });
     cleanup = () => { timer.stop(); if (saver.pending()) saver.saveNow(); };
     evidenceBank(piece, saver, { open: true });
+    wireStepper(piece, saver);
 
     $$("[data-plan]", root).forEach((box) => {
       box.value = piece.plan[box.dataset.plan] || "";
@@ -1274,7 +1285,7 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
 
     root.innerHTML = `
       <div class="card stack">
-        ${stepper(piece, "write")}
+        ${stepper("write")}
         <div>
           <div class="writing-prompt">${esc(piece.prompt)}</div>
           <div class="row" style="gap:6px; margin-top:8px;">${summaryTags(piece)}</div>
@@ -1317,6 +1328,7 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
     if (s.writeMinutes) timer = makeTimer($("#timer-host", root), s.writeMinutes, { label: "Writing", doneMessage: "Time's up! Finish your sentence and get feedback." });
     cleanup = () => { timer?.stop(); if (saver.pending()) saver.saveNow(); };
     evidenceBank(piece, saver, { open: !planEntries.length });
+    wireStepper(piece, saver);
 
     const boxes = piece.parts ? $$("[data-part]", root) : [$("#editor", root)];
     if (piece.parts) boxes.forEach((b, i) => { b.value = piece.parts[i] || ""; });
