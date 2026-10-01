@@ -803,7 +803,7 @@ async function saveWriting(piece) {
   if (!cloudWritings) return;
   const { error } = await sb.from("writings").upsert({
     id: piece.id, user_id: authUser.id, topic_id: piece.topicId, prompt: piece.prompt,
-    text: piece.text, parts: piece.parts || null, settings: { ...piece.settings, evidence: piece.evidence || null, plan: piece.plan || null, stage: piece.stage || null }, feedback: piece.feedback || null,
+    text: piece.text, parts: piece.parts || null, settings: { ...piece.settings, evidence: piece.evidence || null, plan: piece.plan || null, stage: piece.stage || null, chat: (piece.chat || []).filter((m) => m.role !== "err").slice(-40) }, feedback: piece.feedback || null,
     word_count: countWords(piece.text), created_at: piece.createdAt, updated_at: piece.updatedAt,
   });
   if (error) { cloudWritings = false; console.warn("Apex: writings table unavailable, saving on this device only —", error.message); }
@@ -819,7 +819,7 @@ async function listWritings(topicId) {
       if (local && local.updatedAt >= r.updated_at) return;
       byId.set(r.id, {
         id: r.id, topicId: r.topic_id, prompt: r.prompt, text: r.text, parts: r.parts || undefined,
-        settings: r.settings || {}, evidence: r.settings?.evidence || undefined, plan: r.settings?.plan || undefined, stage: r.settings?.stage || undefined,
+        settings: r.settings || {}, evidence: r.settings?.evidence || undefined, plan: r.settings?.plan || undefined, stage: r.settings?.stage || undefined, chat: r.settings?.chat || undefined,
         feedback: r.feedback || "", createdAt: r.created_at, updatedAt: r.updated_at,
       });
     });
@@ -996,7 +996,7 @@ function pageWriting(view, t) {
     return `
       <div><label class="field" for="${id}">${label}</label>
         <select id="${id}">
-          ${option(0, noneLabel, current)}
+          ${noneLabel ? option(0, noneLabel, current) : ""}
           ${presets.map((n) => option(n, `${n} minutes`, current)).join("")}
           <option value="custom" ${isCustom ? "selected" : ""}>Custom…</option>
         </select>
@@ -1020,7 +1020,7 @@ function pageWriting(view, t) {
           <div><label class="field" for="s-target">Target length</label>
             <select id="s-target">${option(0, "No target", settings.target)}${[150, 250, 300, 350, 500, 750, 1000].map((n) => option(n, `${n} words`, settings.target)).join("")}</select></div>
           ${minutesPicker("s-plan", "Planning time", [3, 5, 10, 15], settings.planMinutes, "Skip planning")}
-          ${minutesPicker("s-write", "Writing time", [10, 15, 20, 30, 45, 60], settings.writeMinutes, "No timer")}
+          ${minutesPicker("s-write", "Writing time", [10, 15, 20, 30, 45, 60], settings.writeMinutes || DEFAULT_WRITING_SETTINGS[t.special].writeMinutes, null)}
         </div>
         ${isEssay ? `
           <label class="small" style="display:flex; gap:8px; align-items:center;">
@@ -1172,8 +1172,17 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
           <strong>${title}${s.side === side ? " — your side" : ""}</strong>
           <ol>${piece.evidence[side].map(evidenceItemHTML).join("")}</ol>
         </div>`;
-      box.innerHTML = `<div class="ev-grid">${col("for", "👍 For")}${col("against", "👎 Against")}</div>
-        <p class="muted small" style="margin:8px 0 0;">Tip: use your side's evidence in your body paragraphs, and knock down the strongest point from the other side. Evidence is written by AI — click "Check it" to find the real source before you quote it.</p>`;
+      const old = [...piece.evidence.for, ...piece.evidence.against].some((e) => typeof e === "string");
+      box.innerHTML = `
+        ${old ? `<p class="small banner info" style="margin:10px 0 0;">This evidence was made before sources were added. Click <strong>↻ New evidence</strong> to get sources and Check it links.</p>` : ""}
+        <div class="ev-grid">${col("for", "👍 For")}${col("against", "👎 Against")}</div>
+        <div class="row between" style="margin-top:8px; flex-wrap:nowrap; align-items:flex-start;">
+          <p class="muted small" style="margin:0;">Tip: use your side's evidence in your body paragraphs, and knock down the strongest point from the other side. Evidence is written by AI — click "Check it" to find the real source before you quote it.</p>
+          <button class="btn ghost sm" id="ev-new" title="Get different evidence">↻ New evidence</button>
+        </div>`;
+      $("#ev-new", box).addEventListener("click", () => {
+        if (confirm("Replace this evidence with a new set?")) load();
+      });
     };
     async function load() {
       draw("loading");
@@ -1321,12 +1330,14 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
           </div>
         </div>
         <div id="fb" class="explain ${piece.feedback ? "" : "hidden"}"></div>
+        <div id="chat-host"></div>
       </div>`;
 
     const saver = autosave(piece, isNew);
-    let timer = null;
-    if (s.writeMinutes) timer = makeTimer($("#timer-host", root), s.writeMinutes, { label: "Writing", doneMessage: "Time's up! Finish your sentence and get feedback." });
-    cleanup = () => { timer?.stop(); if (saver.pending()) saver.saveNow(); };
+    // Always show a writing timer; older pieces only stored a single `minutes` value.
+    const writeMinutes = s.writeMinutes || s.minutes || DEFAULT_WRITING_SETTINGS[t.special].writeMinutes;
+    const timer = makeTimer($("#timer-host", root), writeMinutes, { label: "Writing", doneMessage: "Time's up! Finish your sentence and get feedback." });
+    cleanup = () => { timer.stop(); if (saver.pending()) saver.saveNow(); };
     evidenceBank(piece, saver, { open: !planEntries.length });
     wireStepper(piece, saver);
 
@@ -1370,12 +1381,107 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
         piece.feedback = await askTutor(writingFeedbackPrompt(t, piece));
         box.textContent = piece.feedback;
         await saver.saveNow();
+        const chatBox = $("#chat-details", root);
+        if (chatBox && !chatBox.open) { chatBox.open = true; chatBox.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
       } catch (err) {
         console.error(err);
         box.textContent = "Couldn't get feedback right now — try again in a moment.";
       }
       if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = "Get AI feedback"; }
     });
+    writingChat(piece, saver);
+  }
+
+  // ----- Chat with the AI about this piece -----
+  function writingChat(piece, saver) {
+    piece.chat ||= [];
+    const kind = isEssay ? "essay" : "story";
+    const host = $("#chat-host", root);
+    host.innerHTML = `
+      <details class="evidence" id="chat-details" open>
+        <summary>💬 Chat with the AI about your ${kind}</summary>
+        <div class="chat" id="w-chat" style="min-height:120px; margin-top:10px;"></div>
+        <form class="chat-form" id="w-chat-form" autocomplete="off">
+          <input type="text" id="w-chat-input" placeholder="Ask about your ${kind}…">
+          <button class="btn" type="submit" id="w-chat-send">Send</button>
+        </form>
+        ${piece.chat.length ? `<button class="btn ghost sm" id="w-chat-clear" style="margin-top:6px;">Clear chat</button>` : ""}
+      </details>`;
+    const log = $("#w-chat", host);
+    const suggestions = isEssay
+      ? ["Is my argument convincing?", "How can I make my introduction stronger?", "Which paragraph is weakest, and why?", "Explain my feedback in simpler words"]
+      : ["What's the best part of my story?", "How can I make my opening more exciting?", "Where should I add more description?", "Explain my feedback in simpler words"];
+
+    const draw = () => {
+      if (!piece.chat.length) {
+        log.innerHTML = `<div class="chat-empty small">Ask anything about your ${kind} — the AI has read it${piece.feedback ? " and your feedback" : ""}.
+          <div class="chips">${suggestions.map((x) => `<button type="button" class="btn secondary sm">${esc(x)}</button>`).join("")}</div></div>`;
+        $$(".chips button", log).forEach((b) => b.addEventListener("click", () => send(b.textContent)));
+        return;
+      }
+      log.innerHTML = piece.chat.map((m) => `<div class="bubble ${m.role}">${esc(m.text)}</div>`).join("");
+      log.scrollTop = log.scrollHeight;
+    };
+
+    const buildPrompt = (question) => {
+      const st = piece.settings || {};
+      const setup = isEssay
+        ? `a ${(ESSAY_TYPES[st.essayType] || ESSAY_TYPES.persuasive).label.toLowerCase()} essay${st.side === "for" ? " arguing FOR" : st.side === "against" ? " arguing AGAINST" : ""} with ${st.paragraphs || 3} body paragraphs`
+        : "a creative story";
+      const history = piece.chat.slice(-10).map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.text}`).join("\n");
+      return `You are a friendly, encouraging Year 7 English tutor chatting with a student about their own writing. Help them understand and improve it: answer their questions, explain feedback, point to specific sentences, and suggest concrete improvements with short examples (a sentence or two at most). Do NOT rewrite whole paragraphs or the whole piece for them — guide them to make the changes themselves. Keep replies under 150 words, warm and clear, with no markdown formatting.
+
+The student is writing ${setup}. The prompt was: "${piece.prompt}"
+
+Their ${kind} so far:
+"""
+${writingText(piece) || "(nothing written yet)"}
+"""
+${piece.feedback ? `
+Feedback they were given earlier:
+"""
+${piece.feedback}
+"""
+` : ""}
+${history ? `Conversation so far:\n${history}\n` : ""}Student: ${question}
+Tutor:`;
+    };
+
+    async function send(question) {
+      question = question.trim();
+      if (!question) return;
+      const input = $("#w-chat-input", host);
+      const btn = $("#w-chat-send", host);
+      const prompt = buildPrompt(question);
+      piece.chat.push({ role: "me", text: question });
+      const pending = { role: "bot", text: "Thinking…" };
+      piece.chat.push(pending);
+      input.value = "";
+      btn.disabled = true;
+      draw();
+      try {
+        pending.text = await askTutor(prompt);
+      } catch (err) {
+        console.error(err);
+        piece.chat.pop();
+        piece.chat.push({ role: "err", text: "Sorry, I couldn't reach the tutor. Please try again in a moment." });
+      }
+      if (!document.body.contains(log)) return;
+      piece.chat = piece.chat.filter((m) => m.role !== "err" || m === piece.chat[piece.chat.length - 1]);
+      draw();
+      btn.disabled = false;
+      input.focus();
+      saver.saveNow();
+    }
+
+    $("#w-chat-form", host).addEventListener("submit", (e) => { e.preventDefault(); send($("#w-chat-input", host).value); });
+    $("#w-chat-clear", host)?.addEventListener("click", () => {
+      if (!confirm("Clear this chat?")) return;
+      piece.chat = [];
+      saver.saveNow();
+      writingChat(piece, saver);
+    });
+    draw();
   }
 
   // ----- My writing list -----
