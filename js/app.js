@@ -803,7 +803,7 @@ async function saveWriting(piece) {
   if (!cloudWritings) return;
   const { error } = await sb.from("writings").upsert({
     id: piece.id, user_id: authUser.id, topic_id: piece.topicId, prompt: piece.prompt,
-    text: piece.text, parts: piece.parts || null, settings: { ...piece.settings, evidence: piece.evidence || null }, feedback: piece.feedback || null,
+    text: piece.text, parts: piece.parts || null, settings: { ...piece.settings, evidence: piece.evidence || null, plan: piece.plan || null, stage: piece.stage || null }, feedback: piece.feedback || null,
     word_count: countWords(piece.text), created_at: piece.createdAt, updated_at: piece.updatedAt,
   });
   if (error) { cloudWritings = false; console.warn("Apex: writings table unavailable, saving on this device only —", error.message); }
@@ -819,7 +819,7 @@ async function listWritings(topicId) {
       if (local && local.updatedAt >= r.updated_at) return;
       byId.set(r.id, {
         id: r.id, topicId: r.topic_id, prompt: r.prompt, text: r.text, parts: r.parts || undefined,
-        settings: r.settings || {}, evidence: r.settings?.evidence || undefined,
+        settings: r.settings || {}, evidence: r.settings?.evidence || undefined, plan: r.settings?.plan || undefined, stage: r.settings?.stage || undefined,
         feedback: r.feedback || "", createdAt: r.created_at, updatedAt: r.updated_at,
       });
     });
@@ -840,11 +840,6 @@ const ESSAY_TYPES = {
   discussion: { label: "Discussion", hint: "weigh up both sides" },
   informative: { label: "Informative", hint: "explain a topic clearly" },
 };
-const DEFAULT_WRITING_SETTINGS = {
-  "essay-writing": { essayType: "persuasive", paragraphs: 3, target: 350, minutes: 20, planner: true },
-  "creative-writing": { target: 300, minutes: 10 },
-};
-
 function writingFeedbackPrompt(t, piece) {
   const s = piece.settings || {};
   const text = writingText(piece);
@@ -890,17 +885,81 @@ Give feedback a teacher would give on an essay, covering:
 Keep it friendly, specific, and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.`;
 }
 
+const DEFAULT_WRITING_SETTINGS = {
+  "essay-writing": { essayType: "persuasive", paragraphs: 3, target: 350, planMinutes: 10, writeMinutes: 30, planner: true },
+  "creative-writing": { target: 300, planMinutes: 5, writeMinutes: 20 },
+};
+
+// A countdown with Start/Pause, −1 / +1 minute and Reset. Renders into `el`.
+function makeTimer(el, minutes, { label = "", doneMessage = "Time's up!" } = {}) {
+  let total = minutes * 60;
+  let left = total;
+  let interval = null;
+  el.innerHTML = `
+    <div class="timer-box">
+      ${label ? `<span class="muted small">${esc(label)}</span>` : ""}
+      <span class="timer" data-t="clock"></span>
+      <button class="btn ghost sm" data-t="minus" title="One minute less">−1</button>
+      <button class="btn secondary sm" data-t="toggle">Start</button>
+      <button class="btn ghost sm" data-t="plus" title="One minute more">+1</button>
+      <button class="btn ghost sm" data-t="reset" title="Reset">↺</button>
+    </div>`;
+  const q = (k) => $(`[data-t="${k}"]`, el);
+  const draw = () => {
+    q("clock").textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+    q("clock").classList.toggle("low", left <= 60);
+    q("toggle").textContent = interval ? "Pause" : left === total ? "Start" : left === 0 ? "Done" : "Resume";
+  };
+  const stop = () => { clearInterval(interval); interval = null; draw(); };
+  q("toggle").addEventListener("click", () => {
+    if (interval) return stop();
+    if (left === 0) return;
+    interval = setInterval(() => {
+      left = Math.max(0, left - 1);
+      if (left === 0) { stop(); toast(doneMessage); }
+      draw();
+    }, 1000);
+    draw();
+  });
+  q("minus").addEventListener("click", () => { left = Math.max(0, left - 60); total = Math.max(60, total - 60); draw(); });
+  q("plus").addEventListener("click", () => { left += 60; total += 60; draw(); });
+  q("reset").addEventListener("click", () => { stop(); total = minutes * 60; left = total; draw(); });
+  draw();
+  return { stop };
+}
+
+function planFields(t, piece) {
+  const s = piece.settings || {};
+  if (t.special === "essay-writing") {
+    const n = s.paragraphs || 3;
+    return [
+      { key: "thesis", label: "Your thesis (main argument)", hint: s.side === "against" ? "In one sentence: why you disagree." : s.side === "for" ? "In one sentence: why you agree." : "In one sentence: your overall view." },
+      ...Array.from({ length: n }, (_, i) => ({ key: `body${i + 1}`, label: `Body paragraph ${i + 1}`, hint: "The main point, and the evidence or example you'll use." })),
+      { key: "conclusion", label: "Conclusion", hint: "How you'll sum up, and your final thought." },
+    ];
+  }
+  return [
+    { key: "character", label: "Main character", hint: "Who are they? What do they want?" },
+    { key: "setting", label: "Setting", hint: "Where and when? What does it look, sound and feel like?" },
+    { key: "problem", label: "The problem", hint: "What goes wrong or changes?" },
+    { key: "climax", label: "Climax", hint: "The most tense moment." },
+    { key: "ending", label: "Ending", hint: "How is it resolved?" },
+  ];
+}
+
 function pageWriting(view, t) {
   const isEssay = t.special === "essay-writing";
   const settingsKey = `apex-writing-settings-${t.special}`;
-  const settings = { ...DEFAULT_WRITING_SETTINGS[t.special], ...(store(settingsKey) || {}) };
+  const saved = store(settingsKey) || {};
+  if (saved.minutes && !saved.writeMinutes) saved.writeMinutes = saved.minutes; // older single-timer setting
+  const settings = { ...DEFAULT_WRITING_SETTINGS[t.special], ...saved };
 
   // One-time move of the old single draft into the saved-writing list.
   const oldDraftKey = `apex-draft-${authUser.id}-${t.id}`;
   const oldDraft = store(oldDraftKey);
   if (oldDraft?.text) {
     const now = new Date().toISOString();
-    saveWriting({ id: newId(), topicId: t.id, prompt: oldDraft.prompt, text: oldDraft.text, settings: { ...settings, planner: false }, createdAt: now });
+    saveWriting({ id: newId(), topicId: t.id, prompt: oldDraft.prompt, text: oldDraft.text, stage: "write", settings: { ...settings, planner: false }, createdAt: now });
   }
   if (oldDraft) store(oldDraftKey, null);
 
@@ -919,8 +978,9 @@ function pageWriting(view, t) {
     <div id="writing"></div>`;
   const root = $("#writing", view);
   const setTab = (name) => $$("#w-tabs button", view).forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  const leaveStage = () => { if (cleanup) { cleanup(); cleanup = null; } };
   $$("#w-tabs button", view).forEach((b) => b.addEventListener("click", () => {
-    if (cleanup) { cleanup(); cleanup = null; }
+    leaveStage();
     b.dataset.tab === "new" ? setup() : mine();
   }));
   const refreshCount = async () => {
@@ -930,8 +990,21 @@ function pageWriting(view, t) {
   };
 
   const option = (value, label, current) => `<option value="${value}" ${String(value) === String(current) ? "selected" : ""}>${label}</option>`;
+  // A minutes picker with preset choices plus "Custom…" that reveals a number box.
+  const minutesPicker = (id, label, presets, current, noneLabel) => {
+    const isCustom = current && !presets.includes(current);
+    return `
+      <div><label class="field" for="${id}">${label}</label>
+        <select id="${id}">
+          ${option(0, noneLabel, current)}
+          ${presets.map((n) => option(n, `${n} minutes`, current)).join("")}
+          <option value="custom" ${isCustom ? "selected" : ""}>Custom…</option>
+        </select>
+        <input type="number" id="${id}-custom" min="1" max="180" value="${isCustom ? current : ""}" placeholder="Minutes" class="${isCustom ? "" : "hidden"}" style="margin-top:6px;">
+      </div>`;
+  };
 
-  // ----- Step 1: settings + prompt -----
+  // ----- Set up -----
   function setup() {
     setTab("new");
     root.innerHTML = `
@@ -946,13 +1019,13 @@ function pageWriting(view, t) {
               <select id="s-paras">${[1, 2, 3, 4, 5, 6].map((n) => option(n, n, settings.paragraphs)).join("")}</select></div>` : ""}
           <div><label class="field" for="s-target">Target length</label>
             <select id="s-target">${option(0, "No target", settings.target)}${[150, 250, 300, 350, 500, 750, 1000].map((n) => option(n, `${n} words`, settings.target)).join("")}</select></div>
-          <div><label class="field" for="s-mins">Timer</label>
-            <select id="s-mins">${option(0, "No timer", settings.minutes)}${[5, 10, 15, 20, 30, 45, 60].map((n) => option(n, `${n} minutes`, settings.minutes)).join("")}</select></div>
+          ${minutesPicker("s-plan", "Planning time", [3, 5, 10, 15], settings.planMinutes, "Skip planning")}
+          ${minutesPicker("s-write", "Writing time", [10, 15, 20, 30, 45, 60], settings.writeMinutes, "No timer")}
         </div>
         ${isEssay ? `
           <label class="small" style="display:flex; gap:8px; align-items:center;">
             <input type="checkbox" id="s-planner" ${settings.planner ? "checked" : ""}>
-            Use the paragraph planner (a separate box for the introduction, each body paragraph and the conclusion)
+            Write in paragraph boxes (a separate box for the introduction, each body paragraph and the conclusion)
           </label>` : ""}
       </div>
       <div class="card stack" style="margin-top:16px;">
@@ -967,32 +1040,40 @@ function pageWriting(view, t) {
         </div>
       </div>`;
 
+    const readMinutes = (id) => {
+      const sel = $(`#${id}`, root).value;
+      $(`#${id}-custom`, root).classList.toggle("hidden", sel !== "custom");
+      if (sel !== "custom") return +sel;
+      return Math.max(1, Math.min(180, parseInt($(`#${id}-custom`, root).value, 10) || 0)) || 0;
+    };
     const readSettings = () => {
       if (isEssay) {
         settings.essayType = $("#s-type", root).value;
         settings.paragraphs = +$("#s-paras", root).value;
         settings.planner = $("#s-planner", root).checked;
+        $("#s-type-hint", root).textContent = `You ${ESSAY_TYPES[settings.essayType].hint}${settings.essayType === "persuasive" ? " — you'll pick for or against" : ""}.`;
       }
       settings.target = +$("#s-target", root).value;
-      settings.minutes = +$("#s-mins", root).value;
+      settings.planMinutes = readMinutes("s-plan");
+      settings.writeMinutes = readMinutes("s-write");
       store(settingsKey, settings);
     };
-    const drawTypeHint = () => {
-      const el = $("#s-type-hint", root);
-      if (el) el.textContent = `You ${ESSAY_TYPES[$("#s-type", root).value].hint}${$("#s-type", root).value === "persuasive" ? " — you'll pick for or against" : ""}.`;
-    };
-    $$("select, input[type=checkbox]", root).forEach((el) => el.addEventListener("change", () => { readSettings(); drawTypeHint(); }));
-    drawTypeHint();
+    $$("select, input", root).forEach((el) => el.addEventListener("change", readSettings));
+    $$("input[type=number]", root).forEach((el) => el.addEventListener("input", readSettings));
+    readSettings();
 
     const start = (prompt) => {
       readSettings();
       const s = { ...settings };
-      const piece = { id: newId(), topicId: t.id, prompt, settings: s, feedback: "", createdAt: new Date().toISOString() };
+      const piece = {
+        id: newId(), topicId: t.id, prompt, settings: s, plan: {}, feedback: "",
+        stage: s.planMinutes ? "plan" : "write", createdAt: new Date().toISOString(),
+      };
       if (isEssay && s.planner) piece.parts = Array(s.paragraphs + 2).fill("");
       else piece.text = "";
       if (isEssay && s.essayType === "persuasive") return chooseSide(piece);
       if (isEssay && s.essayType === "discussion") piece.settings.side = "both";
-      write(piece, { isNew: true });
+      open(piece, { isNew: true });
     };
     $$(".prompt-list button", root).forEach((b) => b.addEventListener("click", () => start(t.prompts[+b.dataset.i])));
     $("#own-go", root).addEventListener("click", () => {
@@ -1015,7 +1096,7 @@ function pageWriting(view, t) {
       </div>`;
     $$("[data-side]", root).forEach((b) => b.addEventListener("click", () => {
       piece.settings.side = b.dataset.side;
-      write(piece, { isNew: true });
+      open(piece, { isNew: true });
     }));
     $("#side-back", root).addEventListener("click", setup);
   }
@@ -1037,41 +1118,151 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
     return evidence;
   }
 
-  // ----- Step 2: the editor -----
-  function write(piece, { isNew = false } = {}) {
+  // ----- Shared by both stages -----
+  function open(piece, { isNew = false } = {}) {
     setTab("new");
-    const s = piece.settings || {};
-    let secondsLeft = (s.minutes || 0) * 60;
-    let timer = null;
-    let saveTimer = null;
-    let saved = !isNew;
+    leaveStage();
+    (piece.stage === "plan" ? planStage : writeStage)(piece, { isNew });
+  }
 
+  // Wires autosave for a stage; returns { scheduleSave, saveNow, setState }.
+  function autosave(piece, isNew) {
+    let timer = null;
+    const setState = (text) => { const el = $("#save-state", root); if (el) el.textContent = text; };
+    const hasContent = () => countWords(writingText(piece)) || Object.values(piece.plan || {}).some((v) => String(v).trim()) || piece.feedback;
+    const saveNow = async () => {
+      clearTimeout(timer);
+      timer = null;
+      if (!hasContent()) return;
+      await saveWriting(piece);
+      setState(cloudWritings ? "Saved ✓" : "Saved on this device ✓");
+      refreshCount();
+    };
+    const scheduleSave = () => { setState("Saving…"); clearTimeout(timer); timer = setTimeout(saveNow, 800); };
+    setState(isNew ? "" : "Saved ✓");
+    return { scheduleSave, saveNow, pending: () => !!timer };
+  }
+
+  function evidenceBank(piece, saver, { open: isOpen }) {
+    const s = piece.settings || {};
+    if (!s.side) return;
+    const host = $("#evidence-host", root);
+    host.innerHTML = `<details class="evidence" ${isOpen ? "open" : ""}><summary>🧾 Evidence bank</summary><div id="evidence"></div></details>`;
+    const box = $("#evidence", host);
+    const draw = (state) => {
+      if (state === "loading") { box.innerHTML = `<p class="muted small">Finding evidence for both sides…</p>`; return; }
+      if (state === "error") {
+        box.innerHTML = `<p class="muted small">Couldn't load evidence right now. <button class="btn ghost sm" id="ev-retry">Try again</button></p>`;
+        $("#ev-retry", box).addEventListener("click", load);
+        return;
+      }
+      const col = (side, title) => `
+        <div class="ev-col ${s.side === side ? "mine" : ""}">
+          <strong>${title}${s.side === side ? " — your side" : ""}</strong>
+          <ol>${piece.evidence[side].map((e) => `<li>${esc(e)}</li>`).join("")}</ol>
+        </div>`;
+      box.innerHTML = `<div class="ev-grid">${col("for", "👍 For")}${col("against", "👎 Against")}</div>
+        <p class="muted small" style="margin:8px 0 0;">Tip: use your side's evidence in your body paragraphs, and knock down the strongest point from the other side.</p>`;
+    };
+    async function load() {
+      draw("loading");
+      try {
+        piece.evidence = await fetchEvidence(piece.prompt);
+        if (!document.body.contains(box)) return;
+        draw();
+        saver.saveNow();
+      } catch (err) {
+        console.error("Apex: evidence request failed —", err);
+        if (document.body.contains(box)) draw("error");
+      }
+    }
+    piece.evidence ? draw() : load();
+  }
+
+  const summaryTags = (piece) => {
+    const s = piece.settings || {};
+    return [
+      isEssay ? `${(ESSAY_TYPES[s.essayType] || ESSAY_TYPES.persuasive).label} essay` : "",
+      isEssay ? `${s.paragraphs} body paragraph${s.paragraphs === 1 ? "" : "s"}` : "",
+      s.side === "for" ? "Arguing FOR" : s.side === "against" ? "Arguing AGAINST" : "",
+      s.target ? `aim for ${s.target} words` : "",
+    ].filter(Boolean).map((x) => `<span class="tag">${esc(x)}</span>`).join("");
+  };
+  const stepper = (piece, active) => (piece.settings?.planMinutes || piece.plan && Object.keys(piece.plan).length
+    ? `<div class="stepper"><span class="${active === "plan" ? "on" : ""}">1. Plan</span><span class="${active === "write" ? "on" : ""}">2. Write</span></div>` : "");
+
+  // ----- Stage 1: plan -----
+  function planStage(piece, { isNew }) {
+    piece.stage = "plan";
+    piece.plan ||= {};
+    const s = piece.settings || {};
+    const fields = planFields(t, piece);
+    root.innerHTML = `
+      <div class="card stack">
+        ${stepper(piece, "plan")}
+        <div>
+          <div class="writing-prompt">${esc(piece.prompt)}</div>
+          <div class="row" style="gap:6px; margin-top:8px;">${summaryTags(piece)}</div>
+        </div>
+        <div class="row between"><div id="timer-host"></div><span class="muted small" id="save-state"></span></div>
+        <div id="evidence-host"></div>
+        <div class="plan-grid">
+          ${fields.map((f) => `
+            <div>
+              <label class="field" for="plan-${f.key}">${esc(f.label)}</label>
+              <div class="muted small" style="margin-bottom:6px;">${esc(f.hint)}</div>
+              <textarea id="plan-${f.key}" data-plan="${f.key}" rows="3"></textarea>
+            </div>`).join("")}
+        </div>
+        <div class="row between">
+          <button class="btn ghost" id="back">← My writing</button>
+          <button class="btn" id="to-write">Start writing →</button>
+        </div>
+      </div>`;
+
+    const saver = autosave(piece, isNew);
+    const timer = makeTimer($("#timer-host", root), s.planMinutes || 5, { label: "Planning", doneMessage: "Planning time's up! Start writing when you're ready." });
+    cleanup = () => { timer.stop(); if (saver.pending()) saver.saveNow(); };
+    evidenceBank(piece, saver, { open: true });
+
+    $$("[data-plan]", root).forEach((box) => {
+      box.value = piece.plan[box.dataset.plan] || "";
+      box.addEventListener("input", () => { piece.plan[box.dataset.plan] = box.value; saver.scheduleSave(); });
+    });
+    $("[data-plan]", root).focus();
+    $("#back", root).addEventListener("click", () => { leaveStage(); mine(); });
+    $("#to-write", root).addEventListener("click", () => {
+      piece.stage = "write";
+      saver.saveNow();
+      open(piece);
+    });
+  }
+
+  // ----- Stage 2: write -----
+  function writeStage(piece, { isNew }) {
+    piece.stage = "write";
+    const s = piece.settings || {};
+    const planEntries = planFields(t, piece).filter((f) => String(piece.plan?.[f.key] || "").trim());
     const partLabel = (i, n) => (i === 0 ? "Introduction" : i === n - 1 ? "Conclusion" : `Body paragraph ${i}`);
     const partHint = (i, n) => (i === 0
       ? "Hook the reader, give some background, and state your main argument (thesis)."
       : i === n - 1
         ? "Restate your thesis in new words, sum up your points, and finish with a strong final thought."
         : "Topic sentence → Explain → Evidence (an example or fact) → Link back to your thesis.");
-    const summary = [
-      isEssay ? `${(ESSAY_TYPES[s.essayType] || ESSAY_TYPES.persuasive).label} essay` : "",
-      isEssay ? `${s.paragraphs} body paragraph${s.paragraphs === 1 ? "" : "s"}` : "",
-      s.side === "for" ? "Arguing FOR" : s.side === "against" ? "Arguing AGAINST" : "",
-      s.target ? `aim for ${s.target} words` : "",
-    ].filter(Boolean);
 
     root.innerHTML = `
       <div class="card stack">
+        ${stepper(piece, "write")}
         <div>
           <div class="writing-prompt">${esc(piece.prompt)}</div>
-          ${summary.length ? `<div class="row" style="gap:6px; margin-top:8px;">${summary.map((x) => `<span class="tag">${esc(x)}</span>`).join("")}</div>` : ""}
+          <div class="row" style="gap:6px; margin-top:8px;">${summaryTags(piece)}</div>
         </div>
-        ${s.side ? `<details class="evidence" open><summary>🧾 Evidence bank</summary><div id="evidence"></div></details>` : ""}
-        <div class="row between">
-          <div class="row">
-            ${s.minutes ? `<span class="timer" id="clock"></span><button class="btn secondary sm" id="clock-btn">Start timer</button>` : ""}
-          </div>
-          <span class="muted small" id="save-state"></span>
-        </div>
+        <div class="row between"><div id="timer-host"></div><span class="muted small" id="save-state"></span></div>
+        ${planEntries.length ? `
+          <details class="evidence" open><summary>🗺️ Your plan</summary>
+            <dl class="plan-view">${planEntries.map((f) => `<dt>${esc(f.label)}</dt><dd>${esc(piece.plan[f.key])}</dd>`).join("")}</dl>
+          </details>` : ""}
+        <div id="evidence-host"></div>
         <div id="editor-area">
           ${piece.parts
             ? piece.parts.map((_, i) => `
@@ -1087,7 +1278,10 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
           ${s.target ? `<div class="bar" style="margin-top:6px;"><span id="target-bar"></span></div>` : ""}
         </div>
         <div class="row between">
-          <button class="btn ghost" id="back">← My writing</button>
+          <div class="row">
+            <button class="btn ghost" id="back">← My writing</button>
+            <button class="btn ghost" id="to-plan">← Back to plan</button>
+          </div>
           <div class="row">
             <button class="btn secondary" id="copy">Copy text</button>
             <button class="btn" id="get-fb">Get AI feedback</button>
@@ -1096,35 +1290,11 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
         <div id="fb" class="explain ${piece.feedback ? "" : "hidden"}"></div>
       </div>`;
 
-    const drawEvidence = (state) => {
-      const box = $("#evidence", root);
-      if (!box) return;
-      if (state === "loading") { box.innerHTML = `<p class="muted small">Finding evidence for both sides…</p>`; return; }
-      if (state === "error") {
-        box.innerHTML = `<p class="muted small">Couldn't load evidence right now. <button class="btn ghost sm" id="ev-retry">Try again</button></p>`;
-        $("#ev-retry", root).addEventListener("click", loadEvidence);
-        return;
-      }
-      const col = (side, title) => `
-        <div class="ev-col ${s.side === side ? "mine" : ""}">
-          <strong>${title}${s.side === side ? " — your side" : ""}</strong>
-          <ol>${piece.evidence[side].map((e) => `<li>${esc(e)}</li>`).join("")}</ol>
-        </div>`;
-      box.innerHTML = `<div class="ev-grid">${col("for", "👍 For")}${col("against", "👎 Against")}</div>
-        <p class="muted small" style="margin:8px 0 0;">Tip: use your side's evidence in your body paragraphs, and knock down the strongest point from the other side.</p>`;
-    };
-    async function loadEvidence() {
-      drawEvidence("loading");
-      try {
-        piece.evidence = await fetchEvidence(piece.prompt);
-        if (!document.body.contains(root)) return;
-        drawEvidence();
-        if (saved || countWords(writingText(piece))) saveNow();
-      } catch (err) {
-        console.error("Apex: evidence request failed —", err);
-        if (document.body.contains(root)) drawEvidence("error");
-      }
-    }
+    const saver = autosave(piece, isNew);
+    let timer = null;
+    if (s.writeMinutes) timer = makeTimer($("#timer-host", root), s.writeMinutes, { label: "Writing", doneMessage: "Time's up! Finish your sentence and get feedback." });
+    cleanup = () => { timer?.stop(); if (saver.pending()) saver.saveNow(); };
+    evidenceBank(piece, saver, { open: !planEntries.length });
 
     const boxes = piece.parts ? $$("[data-part]", root) : [$("#editor", root)];
     if (piece.parts) boxes.forEach((b, i) => { b.value = piece.parts[i] || ""; });
@@ -1132,10 +1302,6 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
     if (piece.feedback) $("#fb", root).textContent = piece.feedback;
     boxes[0].focus();
 
-    const collect = () => {
-      if (piece.parts) piece.parts = boxes.map((b) => b.value);
-      else piece.text = boxes[0].value;
-    };
     const drawWords = () => {
       const n = countWords(writingText(piece));
       $("#words", root).textContent = `${n} words`;
@@ -1144,48 +1310,16 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
         $("#target-bar", root).style.width = Math.min(100, Math.round((n / s.target) * 100)) + "%";
       }
     };
-    const saveState = (text) => { const el = $("#save-state", root); if (el) el.textContent = text; };
-    const saveNow = async () => {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-      if (!countWords(writingText(piece)) && !piece.feedback) return; // don't save empty pieces
-      await saveWriting(piece);
-      saved = true;
-      saveState(cloudWritings ? "Saved ✓" : "Saved on this device ✓");
-      refreshCount();
-    };
     drawWords();
-    saveState(saved ? "Saved ✓" : "");
-    if (s.side) piece.evidence ? drawEvidence() : loadEvidence();
-
     boxes.forEach((b) => b.addEventListener("input", () => {
-      collect();
+      if (piece.parts) piece.parts = boxes.map((x) => x.value);
+      else piece.text = boxes[0].value;
       drawWords();
-      saveState("Saving…");
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveNow, 800);
+      saver.scheduleSave();
     }));
 
-    const clock = $("#clock", root);
-    const drawClock = () => {
-      if (!clock) return;
-      clock.textContent = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
-      clock.classList.toggle("low", secondsLeft <= 60);
-    };
-    const stop = () => { clearInterval(timer); timer = null; const b = $("#clock-btn", root); if (b) b.textContent = "Start timer"; };
-    drawClock();
-    $("#clock-btn", root)?.addEventListener("click", () => {
-      if (timer) return stop();
-      $("#clock-btn", root).textContent = "Pause";
-      timer = setInterval(() => {
-        secondsLeft = Math.max(0, secondsLeft - 1);
-        drawClock();
-        if (secondsLeft === 0) { stop(); toast("Time's up! Finish your sentence and get feedback."); }
-      }, 1000);
-    });
-    cleanup = () => { stop(); if (saveTimer) saveNow(); };
-
-    $("#back", root).addEventListener("click", async () => { cleanup(); cleanup = null; mine(); });
+    $("#back", root).addEventListener("click", () => { leaveStage(); mine(); });
+    $("#to-plan", root).addEventListener("click", () => { piece.stage = "plan"; saver.saveNow(); open(piece); });
     $("#copy", root).addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(writingText(piece)); toast("Copied to clipboard"); }
       catch (e) { toast("Couldn't copy — select the text and copy it instead."); }
@@ -1201,7 +1335,7 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
       try {
         piece.feedback = await askTutor(writingFeedbackPrompt(t, piece));
         box.textContent = piece.feedback;
-        await saveNow();
+        await saver.saveNow();
       } catch (err) {
         console.error(err);
         box.textContent = "Couldn't get feedback right now — try again in a moment.";
@@ -1233,13 +1367,15 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
         <div class="list-row">
           <div class="grow">
             <strong>${esc(p.prompt)}</strong>
-            <div class="muted small">${bits.map(esc).join(" · ")} ${p.feedback ? `<span class="tag good">Has feedback</span>` : ""}</div>
+            <div class="muted small">${bits.map(esc).join(" · ")}
+              ${p.stage === "plan" ? `<span class="tag">Planning</span>` : ""}
+              ${p.feedback ? `<span class="tag good">Has feedback</span>` : ""}</div>
           </div>
           <button class="btn secondary sm" data-piece="${p.id}">Open</button>
           <button class="btn ghost sm" data-del="${p.id}" title="Delete">Delete</button>
         </div>`;
     }).join("")}</div>`;
-    $$("[data-piece]", root).forEach((b) => b.addEventListener("click", () => write(pieces.find((p) => p.id === b.dataset.piece))));
+    $$("[data-piece]", root).forEach((b) => b.addEventListener("click", () => open(pieces.find((p) => p.id === b.dataset.piece))));
     $$("[data-del]", root).forEach((b) => b.addEventListener("click", async () => {
       if (!confirm("Delete this piece? This can't be undone.")) return;
       await deleteWriting(b.dataset.del);

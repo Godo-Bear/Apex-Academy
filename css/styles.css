@@ -316,3 +316,15 @@ details[open] summary { margin-bottom: 4px; }
 .ev-col.mine { background: var(--accent-soft); outline: 2px solid var(--accent); }
 .ev-col ol { margin: 6px 0 0; padding-left: 20px; }
 .ev-col li { margin: 4px 0; }
+
+.timer-box { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.timer-box .timer { min-width: 64px; }
+.stepper { display: flex; gap: 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.stepper span { padding: 4px 12px; border-radius: 999px; background: var(--surface-2); }
+.stepper span.on { background: var(--accent); color: var(--accent-ink); }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.plan-grid textarea { min-height: 80px; }
+.plan-view { margin: 8px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; }
+.plan-view dt { font-weight: 700; }
+.plan-view dd { margin: 0; white-space: pre-wrap; }
+@media (max-width: 760px) { .plan-view { grid-template-columns: 1fr; } .plan-view dd { margin-bottom: 6px; } }
