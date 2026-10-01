@@ -1106,13 +1106,24 @@ function pageWriting(view, t) {
     const raw = await askTutor(`A Year 7 student is writing an essay on this topic:
 "${prompt}"
 
-Give exactly 4 strong pieces of evidence FOR the statement/position and exactly 4 strong pieces of evidence AGAINST it. Each piece should be one or two sentences a Year 7 student can understand and use in a paragraph: a clear reason backed by a concrete example, fact or real-world situation. Only use well-known, accurate facts — don't invent statistics, studies or quotes. If the topic isn't really a for/against question, interpret "for" as supporting the main idea and "against" as challenging it.
+Give exactly 4 strong pieces of evidence FOR the statement/position and exactly 4 strong pieces of evidence AGAINST it. If the topic isn't really a for/against question, interpret "for" as supporting the main idea and "against" as challenging it.
+
+For each piece give:
+- "point": one or two sentences a Year 7 student can understand and use in a paragraph — a clear reason backed by a concrete example, fact or real-world situation. Only use well-known, accurate facts; don't invent statistics or studies.
+- "source": the real organisation, official body or well-known publication most associated with this information (prefer Australian ones where they fit, e.g. Australian Bureau of Statistics, eSafety Commissioner, Australian Institute of Health and Welfare, Raising Children Network; otherwise e.g. World Health Organization, UNICEF). Name the organisation only.
+- "expert": one sentence paraphrasing what professionals in this field generally say, e.g. "Paediatric sleep researchers recommend…". Describe the type of expert — never name a specific person and never use quotation marks.
+- "search": a short web search phrase (5–8 words) a student could use to find this information from that source.
+
+Never invent URLs, page titles, people's names or direct quotes.
 
 Respond with ONLY valid JSON, no other text, in exactly this format:
-{"for": ["...", "...", "...", "..."], "against": ["...", "...", "...", "..."]}`);
+{"for": [{"point": "...", "source": "...", "expert": "...", "search": "..."}, ...4 items], "against": [...4 items in the same format]}`);
     const json = raw.replace(/```json/gi, "").replace(/```/g, "");
     const parsed = JSON.parse(json.slice(json.indexOf("{"), json.lastIndexOf("}") + 1));
-    const clean = (arr) => (Array.isArray(arr) ? arr.map((x) => String(x).trim()).filter(Boolean).slice(0, 4) : []);
+    const item = (x) => (typeof x === "string"
+      ? { point: x.trim() }
+      : { point: String(x?.point || "").trim(), source: String(x?.source || "").trim(), expert: String(x?.expert || "").trim(), search: String(x?.search || "").trim() });
+    const clean = (arr) => (Array.isArray(arr) ? arr.map(item).filter((x) => x.point).slice(0, 4) : []);
     const evidence = { for: clean(parsed.for), against: clean(parsed.against) };
     if (!evidence.for.length || !evidence.against.length) throw new Error("Missing evidence");
     return evidence;
@@ -1159,10 +1170,10 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
       const col = (side, title) => `
         <div class="ev-col ${s.side === side ? "mine" : ""}">
           <strong>${title}${s.side === side ? " — your side" : ""}</strong>
-          <ol>${piece.evidence[side].map((e) => `<li>${esc(e)}</li>`).join("")}</ol>
+          <ol>${piece.evidence[side].map(evidenceItemHTML).join("")}</ol>
         </div>`;
       box.innerHTML = `<div class="ev-grid">${col("for", "👍 For")}${col("against", "👎 Against")}</div>
-        <p class="muted small" style="margin:8px 0 0;">Tip: use your side's evidence in your body paragraphs, and knock down the strongest point from the other side.</p>`;
+        <p class="muted small" style="margin:8px 0 0;">Tip: use your side's evidence in your body paragraphs, and knock down the strongest point from the other side. Evidence is written by AI — click "Check it" to find the real source before you quote it.</p>`;
     };
     async function load() {
       draw("loading");
@@ -1177,6 +1188,17 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
       }
     }
     piece.evidence ? draw() : load();
+  }
+
+  // Evidence items are { point, source, expert, search } (older pieces stored plain strings).
+  function evidenceItemHTML(e) {
+    if (typeof e === "string") return `<li>${esc(e)}</li>`;
+    const query = encodeURIComponent([e.source, e.search || e.point].filter(Boolean).join(" "));
+    return `<li>
+      <div>${esc(e.point)}</div>
+      ${e.source ? `<div class="ev-meta">📚 Source: ${esc(e.source)} · <a href="https://www.google.com/search?q=${query}" target="_blank" rel="noopener">Check it ↗</a></div>` : ""}
+      ${e.expert ? `<div class="ev-meta">🎓 ${esc(e.expert)}</div>` : ""}
+    </li>`;
   }
 
   const summaryTags = (piece) => {

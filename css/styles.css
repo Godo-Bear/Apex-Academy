@@ -328,3 +328,6 @@ details[open] summary { margin-bottom: 4px; }
 .plan-view dt { font-weight: 700; }
 .plan-view dd { margin: 0; white-space: pre-wrap; }
 @media (max-width: 760px) { .plan-view { grid-template-columns: 1fr; } .plan-view dd { margin-bottom: 6px; } }
+.ev-col li { margin: 8px 0; }
+.ev-meta { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.ev-meta a { font-weight: 600; }
