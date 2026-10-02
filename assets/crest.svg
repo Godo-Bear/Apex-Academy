@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="200 112 624 632" role="img" aria-label="Apex Academy">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="#22365F"/><stop offset="1" stop-color="#111A30"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7C46C"/><stop offset="1" stop-color="#D4862E"/>
+    </linearGradient>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#368189"/><stop offset="1" stop-color="#1F5056"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <path d="M478 724 Q210 684 260 320" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linecap="round"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(427.6 712.8) rotate(-201.0) scale(1.10)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(427.6 712.8) rotate(-125.0) scale(1.10)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(380.5 693.4) rotate(-190.0) scale(1.06)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(380.5 693.4) rotate(-114.0) scale(1.06)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(340.7 666.7) rotate(-177.8) scale(1.01)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(340.7 666.7) rotate(-101.8) scale(1.01)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(308.3 632.4) rotate(-165.1) scale(0.96)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(308.3 632.4) rotate(-89.1) scale(0.96)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(283.2 590.6) rotate(-153.2) scale(0.91)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(283.2 590.6) rotate(-77.2) scale(0.91)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(265.5 541.3) rotate(-142.8) scale(0.86)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(265.5 541.3) rotate(-66.8) scale(0.86)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(255.2 484.6) rotate(-134.3) scale(0.81)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(255.2 484.6) rotate(-58.3) scale(0.81)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(252.2 420.3) rotate(-127.4) scale(0.77)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(252.2 420.3) rotate(-51.4) scale(0.77)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(256.5 348.6) rotate(-121.9) scale(0.72)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(256.5 348.6) rotate(-45.9) scale(0.72)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(260.0 320.0) rotate(-82.2) scale(0.7)"/>
+  <path d="M546 724 Q814 684 764 320" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linecap="round"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(596.4 712.8) rotate(21.0) scale(1.10)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(596.4 712.8) rotate(-55.0) scale(1.10)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(643.5 693.4) rotate(10.0) scale(1.06)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(643.5 693.4) rotate(-66.0) scale(1.06)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(683.3 666.7) rotate(-2.2) scale(1.01)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(683.3 666.7) rotate(-78.2) scale(1.01)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(715.7 632.4) rotate(-14.9) scale(0.96)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(715.7 632.4) rotate(-90.9) scale(0.96)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(740.8 590.6) rotate(-26.8) scale(0.91)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(740.8 590.6) rotate(-102.8) scale(0.91)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(758.5 541.3) rotate(-37.2) scale(0.86)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(758.5 541.3) rotate(-113.2) scale(0.86)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(768.8 484.6) rotate(-45.7) scale(0.81)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(768.8 484.6) rotate(-121.7) scale(0.81)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(771.8 420.3) rotate(-52.6) scale(0.77)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(771.8 420.3) rotate(-128.6) scale(0.77)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(767.5 348.6) rotate(-58.1) scale(0.72)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(767.5 348.6) rotate(-134.1) scale(0.72)"/>
+<path d="M0 0 C12 -11 34 -12 48 0 C34 12 12 11 0 0 Z" fill="url(#gold)" transform="translate(764.0 320.0) rotate(-97.8) scale(0.7)"/>
+  <g filter="url(#shadow)">
+    <g transform="translate(312 196)"><path d="M0 34 Q0 0 34 0 H366 Q400 0 400 34 V230 C400 360 300 440 200 480 C100 440 0 360 0 230 Z" fill="url(#gold)"/>
+<path d="M0 34 Q0 0 34 0 H366 Q400 0 400 34 V230 C400 360 300 440 200 480 C100 440 0 360 0 230 Z" fill="url(#field)" transform="translate(200 232) scale(0.925) translate(-200 -232)"/>
+<path d="M0 34 Q0 0 34 0 H366 Q400 0 400 34 V230 C400 360 300 440 200 480 C100 440 0 360 0 230 Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="2.4" transform="translate(200 232) scale(0.87) translate(-200 -232)"/>
+<path d="M78 100 H104 M91 87 V113" stroke="#FFE2A8" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+<path d="M322 196 L342 216 M342 196 L322 216" stroke="#FFE2A8" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+<path d="M328 128 H354" stroke="#FFE2A8" stroke-width="6.5" stroke-linecap="round" fill="none"/><circle cx="341" cy="117" r="3.8" fill="#FFE2A8"/><circle cx="341" cy="139" r="3.8" fill="#FFE2A8"/>
+<path d="M62 196 H86 M62 207 H86" stroke="#FFE2A8" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+<circle cx="138" cy="64" r="2.6" fill="#FFE2A8" opacity="0.8"/>
+<circle cx="186" cy="42" r="2.2" fill="#FFE2A8" opacity="0.8"/>
+<circle cx="360" cy="78" r="2.2" fill="#FFE2A8" opacity="0.8"/>
+<circle cx="108" cy="150" r="2.0" fill="#FFE2A8" opacity="0.8"/>
+<circle cx="300" cy="160" r="1.8" fill="#FFE2A8" opacity="0.8"/>
+<clipPath id="horizon"><rect x="-100" y="-100" width="600" height="423"/></clipPath><g clip-path="url(#horizon)">
+<clipPath id="notGold"><path clip-rule="evenodd" d="M-500 -500 H900 V900 H-500 Z M244.00 90.00 L344.00 350.00 L144.00 350.00 Z"/></clipPath>
+<g clip-path="url(#notGold)">
+    <clipPath id="waL"><path d="M150.00 102.00 L156.00 406.00 L-2000.00 406.00 L-2000.00 102.00 Z"/></clipPath>
+    <g>
+      <path d="M150.00 162.00 L226.00 346.00 L74.00 346.00 Z M150.00 222.72 L200.92 346.00 L99.08 346.00 Z M128.48 272.40 L171.52 272.40 L180.64 294.48 L119.36 294.48 Z" fill="#C5DBE0" fill-rule="evenodd" />
+      <path d="M150.00 162.00 L226.00 346.00 L74.00 346.00 Z M150.00 222.72 L200.92 346.00 L99.08 346.00 Z M128.48 272.40 L171.52 272.40 L180.64 294.48 L119.36 294.48 Z" fill="#FFFFFF" fill-rule="evenodd" clip-path="url(#waL)"/>
+    </g></g>
+
+    <clipPath id="gaL"><path d="M244.00 38.00 L250.00 406.00 L-2000.00 406.00 L-2000.00 38.00 Z"/></clipPath>
+    <g>
+      <path d="M244.00 98.00 L340.00 346.00 L148.00 346.00 Z M244.00 179.84 L308.32 346.00 L179.68 346.00 Z M217.08 246.80 L270.92 246.80 L282.44 276.56 L205.56 276.56 Z" fill="#D4862E" fill-rule="evenodd" stroke="#2A666D" stroke-width="7" stroke-linejoin="round" paint-order="stroke"/>
+      <path d="M244.00 98.00 L340.00 346.00 L148.00 346.00 Z M244.00 179.84 L308.32 346.00 L179.68 346.00 Z M217.08 246.80 L270.92 246.80 L282.44 276.56 L205.56 276.56 Z" fill="#F7C46C" fill-rule="evenodd" clip-path="url(#gaL)"/>
+    </g>
+
+    <clipPath id="gsL"><path d="M244.00 38.00 L250.00 406.00 L-2000.00 406.00 L-2000.00 38.00 Z"/></clipPath>
+    <g>
+      <path d="M244.00 98.00 L268.00 160.00 L254.80 145.12 L245.20 168.68 L234.40 147.60 L220.00 160.00 Z" fill="#DCEAEE" fill-rule="evenodd" />
+      <path d="M244.00 98.00 L268.00 160.00 L254.80 145.12 L245.20 168.68 L234.40 147.60 L220.00 160.00 Z" fill="#FFFFFF" fill-rule="evenodd" clip-path="url(#gsL)"/>
+    </g>
+</g>
+
+    <path d="M 200 338 C 174 321 132 317 96 325 L 96 386 C 132 378 174 382 200 400" fill="url(#gold)"/>
+    <path d="M 200 338 C 226 321 268 317 304 325 L 304 386 C 268 378 226 382 200 400" fill="url(#gold)"/>
+    <path d="M 200 330 C 175 313 135 309 102 316 L 102 376 C 135 369 175 373 200 390" fill="#FFFFFF"/>
+    <path d="M 200 330 C 225 313 265 309 298 316 L 298 376 C 265 369 225 373 200 390" fill="#E6EFF1"/>
+    <g fill="none" stroke="#9FC3C8" stroke-width="2" stroke-linecap="round">
+      <path d="M 188 340 C 168 329 140 326 114 331"/><path d="M 188 352 C 168 341 140 338 114 343"/><path d="M 188 364 C 168 353 140 350 114 355"/>
+      <path d="M 212 340 C 232 329 260 326 286 331"/><path d="M 212 352 C 232 341 260 338 286 343"/><path d="M 212 364 C 232 353 260 350 286 355"/>
+    </g>
+    <path d="M 200 330 V 390" stroke="#B9D2D6" stroke-width="2.2"/></g>
+    
+  <g transform="translate(512 190) scale(1.0)">
+    <path d="M-74 26 C-74 50 74 50 74 26 V6 H-74 Z" fill="#0D1628" stroke="url(#gold)" stroke-width="4"/>
+    <path d="M0 -40 L118 0 L0 40 L-118 0 Z" fill="#0D1628" stroke="url(#gold)" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="0" cy="0" r="7" fill="url(#gold)"/>
+    <path d="M0 0 L96 12 V58" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M88 56 H104 L108 84 H84 Z" fill="url(#gold)"/>
+  </g>
+  </g>
+</svg>

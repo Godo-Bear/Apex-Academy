@@ -233,8 +233,10 @@ function showScreen(name) {
   ["loading", "auth", "paywall", "app"].forEach((s) => $(`#screen-${s}`).classList.toggle("hidden", s !== name));
 }
 
+// Large spots (login, paywall) get the full crest; everywhere else the compact shield.
 document.querySelectorAll("[data-logo]").forEach((el) => {
-  el.prepend($("#logo-tpl").content.cloneNode(true));
+  const tpl = el.classList.contains("logo-stack") ? "#crest-tpl" : "#logo-tpl";
+  el.prepend($(tpl).content.cloneNode(true));
 });
 
 // ---------------- Theme ----------------
@@ -513,7 +515,7 @@ function pageHome(view) {
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   view.innerHTML = `
     <div class="card brand-hero">
-      ${$("#logo-tpl").innerHTML}
+      ${$("#crest-tpl").innerHTML}
       <div>
         <h2><b>Apex</b> Learning Academy</h2>
         <p>Year 7 Maths &amp; English · Victorian Curriculum</p>

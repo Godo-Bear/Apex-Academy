@@ -1,11 +1,56 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Apex Academy">
-  <path d="M32 9 L53 15.5 V32 C53 45 44 54 32 59 C20 54 11 45 11 32 V15.5 Z" fill="#2F6F76"/>
-  <path d="M32 9 L53 15.5 V32 C53 45 44 54 32 59 C20 54 11 45 11 32 V15.5 Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="0.9" transform="translate(32 33) scale(0.88) translate(-32 -33)"/>
-  <path d="M23.25 26.50 L31.50 44.50 L27.54 44.50 L26.22 40.54 L20.28 40.54 L18.96 44.50 L15.00 44.50 Z M23.25 32.26 L24.73 36.94 L21.77 36.94 Z" fill="#FFFFFF" fill-rule="evenodd"/>
-  <path d="M39.75 20.50 L49.00 44.50 L44.56 44.50 L43.08 39.22 L36.42 39.22 L34.94 44.50 L30.50 44.50 Z M39.75 28.18 L41.41 34.42 L38.09 34.42 Z" fill="#E3963E" fill-rule="evenodd"/>
-  <path d="M39.75 20.50 L42.16 26.74 L40.86 25.30 L39.75 27.22 L38.64 25.30 L37.34 26.74 Z" fill="#FFFFFF"/>
-  <path d="M17 47 H47.5" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="1.3" stroke-linecap="round"/>
-  <path d="M32 2.5 L47 8.5 L32 14.5 L17 8.5 Z" fill="#E3963E" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"/>
-  <path d="M44 10 V15.5" stroke="#E3963E" stroke-width="1.6" stroke-linecap="round"/>
-  <circle cx="44" cy="16.5" r="1.6" fill="#E3963E"/>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="#22365F"/><stop offset="1" stop-color="#111A30"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7C46C"/><stop offset="1" stop-color="#D4862E"/>
+    </linearGradient>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#368189"/><stop offset="1" stop-color="#1F5056"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <g transform="translate(12 14.6) scale(0.1)"><path d="M0 34 Q0 0 34 0 H366 Q400 0 400 34 V230 C400 360 300 440 200 480 C100 440 0 360 0 230 Z" fill="url(#gold)"/>
+<path d="M0 34 Q0 0 34 0 H366 Q400 0 400 34 V230 C400 360 300 440 200 480 C100 440 0 360 0 230 Z" fill="url(#field)" transform="translate(200 232) scale(0.925) translate(-200 -232)"/>
+<path d="M0 34 Q0 0 34 0 H366 Q400 0 400 34 V230 C400 360 300 440 200 480 C100 440 0 360 0 230 Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="2.4" transform="translate(200 232) scale(0.87) translate(-200 -232)"/>
+<clipPath id="horizon"><rect x="-100" y="-100" width="600" height="423"/></clipPath><g clip-path="url(#horizon)">
+<clipPath id="notGold"><path clip-rule="evenodd" d="M-500 -500 H900 V900 H-500 Z M244.00 90.00 L344.00 350.00 L144.00 350.00 Z"/></clipPath>
+<g clip-path="url(#notGold)">
+    <clipPath id="waL"><path d="M150.00 102.00 L156.00 406.00 L-2000.00 406.00 L-2000.00 102.00 Z"/></clipPath>
+    <g>
+      <path d="M150.00 162.00 L226.00 346.00 L74.00 346.00 Z M150.00 222.72 L200.92 346.00 L99.08 346.00 Z M128.48 272.40 L171.52 272.40 L180.64 294.48 L119.36 294.48 Z" fill="#C5DBE0" fill-rule="evenodd" />
+      <path d="M150.00 162.00 L226.00 346.00 L74.00 346.00 Z M150.00 222.72 L200.92 346.00 L99.08 346.00 Z M128.48 272.40 L171.52 272.40 L180.64 294.48 L119.36 294.48 Z" fill="#FFFFFF" fill-rule="evenodd" clip-path="url(#waL)"/>
+    </g></g>
+
+    <clipPath id="gaL"><path d="M244.00 38.00 L250.00 406.00 L-2000.00 406.00 L-2000.00 38.00 Z"/></clipPath>
+    <g>
+      <path d="M244.00 98.00 L340.00 346.00 L148.00 346.00 Z M244.00 179.84 L308.32 346.00 L179.68 346.00 Z M217.08 246.80 L270.92 246.80 L282.44 276.56 L205.56 276.56 Z" fill="#D4862E" fill-rule="evenodd" stroke="#2A666D" stroke-width="7" stroke-linejoin="round" paint-order="stroke"/>
+      <path d="M244.00 98.00 L340.00 346.00 L148.00 346.00 Z M244.00 179.84 L308.32 346.00 L179.68 346.00 Z M217.08 246.80 L270.92 246.80 L282.44 276.56 L205.56 276.56 Z" fill="#F7C46C" fill-rule="evenodd" clip-path="url(#gaL)"/>
+    </g>
+
+    <clipPath id="gsL"><path d="M244.00 38.00 L250.00 406.00 L-2000.00 406.00 L-2000.00 38.00 Z"/></clipPath>
+    <g>
+      <path d="M244.00 98.00 L268.00 160.00 L254.80 145.12 L245.20 168.68 L234.40 147.60 L220.00 160.00 Z" fill="#DCEAEE" fill-rule="evenodd" />
+      <path d="M244.00 98.00 L268.00 160.00 L254.80 145.12 L245.20 168.68 L234.40 147.60 L220.00 160.00 Z" fill="#FFFFFF" fill-rule="evenodd" clip-path="url(#gsL)"/>
+    </g>
+</g>
+
+    <path d="M 200 338 C 174 321 132 317 96 325 L 96 386 C 132 378 174 382 200 400" fill="url(#gold)"/>
+    <path d="M 200 338 C 226 321 268 317 304 325 L 304 386 C 268 378 226 382 200 400" fill="url(#gold)"/>
+    <path d="M 200 330 C 175 313 135 309 102 316 L 102 376 C 135 369 175 373 200 390" fill="#FFFFFF"/>
+    <path d="M 200 330 C 225 313 265 309 298 316 L 298 376 C 265 369 225 373 200 390" fill="#E6EFF1"/>
+    <g fill="none" stroke="#9FC3C8" stroke-width="2" stroke-linecap="round">
+      <path d="M 188 340 C 168 329 140 326 114 331"/><path d="M 188 352 C 168 341 140 338 114 343"/><path d="M 188 364 C 168 353 140 350 114 355"/>
+      <path d="M 212 340 C 232 329 260 326 286 331"/><path d="M 212 352 C 232 341 260 338 286 343"/><path d="M 212 364 C 232 353 260 350 286 355"/>
+    </g>
+    <path d="M 200 330 V 390" stroke="#B9D2D6" stroke-width="2.2"/></g>
+  <g transform="translate(32 12.4) scale(0.118)">
+    <path d="M-74 26 C-74 50 74 50 74 26 V6 H-74 Z" fill="#0D1628" stroke="url(#gold)" stroke-width="7"/>
+    <path d="M0 -40 L118 0 L0 40 L-118 0 Z" fill="#0D1628" stroke="url(#gold)" stroke-width="9" stroke-linejoin="round"/>
+    <path d="M0 0 L96 12 V58" fill="none" stroke="url(#gold)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M86 56 H106 L110 88 H82 Z" fill="url(#gold)"/>
+  </g>
 </svg>
