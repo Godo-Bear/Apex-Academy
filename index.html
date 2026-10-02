@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="css/styles.css?v=20261001c">
 <script>
   // Apply the saved theme before first paint to avoid a flash.
@@ -17,13 +18,19 @@
 <body>
 
 <template id="logo-tpl">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M3 21 L11 5 L15 13 L21 3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle class="dot-ink" cx="11" cy="5" r="2"/>
-    <circle class="dot-ink" cx="15" cy="13" r="2"/>
-    <circle class="dot-accent" cx="21" cy="3" r="2"/>
-    <circle class="dot-accent" cx="3" cy="21" r="2"/>
-  </svg>
+  <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
+  <!-- shield -->
+  <path d="M32 9 L53 15.5 V32 C53 45 44 54 32 59 C20 54 11 45 11 32 V15.5 Z" fill="#2F6F76"/>
+  <!-- interlocking AA: twin peaks -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16.5 47 L24.25 25 L32 47 L39.75 25 L47.5 47"/>
+    <path d="M20.2 38.5 H28.3 M35.7 38.5 H43.8"/>
+  </g>
+  <!-- graduation cap -->
+  <path d="M32 2.5 L47 8.5 L32 14.5 L17 8.5 Z" fill="#E3963E" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M43 10 V17" stroke="#E3963E" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="43" cy="18" r="1.8" fill="#E3963E"/>
+</svg>
 </template>
 
 <!-- Loading -->
@@ -32,8 +39,8 @@
 <!-- Auth -->
 <div id="screen-auth" class="center-screen hidden">
   <div class="card auth-card">
-    <div class="logo" data-logo>Apex Learning Academy</div>
-    <p class="muted small">Year 7 maths and English practice.</p>
+    <div class="logo logo-stack" data-logo><span class="wordmark"><b>Apex</b> Learning Academy</span></div>
+    <p class="muted small" style="text-align:center;">Year 7 Maths &amp; English · Victorian Curriculum</p>
 
     <div id="auth-main">
       <div class="segmented" style="margin-top:14px;">
@@ -82,7 +89,7 @@
 <!-- Paywall -->
 <div id="screen-paywall" class="center-screen hidden">
   <div class="card auth-card" style="text-align:center;">
-    <div class="logo" data-logo style="justify-content:center;">Apex Learning Academy</div>
+    <div class="logo logo-stack" data-logo><span class="wordmark"><b>Apex</b> Learning Academy</span></div>
     <h2 style="margin-top:20px;">Almost there</h2>
     <p class="muted">Your account (<strong id="paywall-email"></strong>) isn't active yet. Contact the site owner to arrange payment, then check again.</p>
     <button id="paywall-recheck" class="btn block">I've paid — check again</button>
@@ -93,7 +100,7 @@
 <!-- App -->
 <div id="screen-app" class="app hidden">
   <aside class="sidebar">
-    <div class="logo" data-logo>Apex Academy</div>
+    <div class="logo" data-logo><span class="wordmark"><b>Apex</b> Academy</span></div>
     <nav id="nav"></nav>
     <div class="sidebar-foot">
       <div class="me-box"><strong id="me-name"></strong><span class="muted" id="me-rank" style="display:block;"></span><span class="muted" id="me-stats"></span></div>
@@ -105,7 +112,7 @@
 
   <main>
     <div class="mobile-top">
-      <div class="logo" data-logo>Apex</div>
+      <div class="logo" data-logo><span class="wordmark"><b>Apex</b><span class="wm-rest"> Academy</span></span></div>
       <div class="row" style="gap:4px;">
         <span class="small muted" id="me-stats-mobile"></span>
         <button class="btn ghost" id="theme-toggle-m" aria-label="Toggle theme">◐</button>

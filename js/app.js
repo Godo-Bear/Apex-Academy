@@ -512,6 +512,13 @@ function pageHome(view) {
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   view.innerHTML = `
+    <div class="card brand-hero">
+      ${$("#logo-tpl").innerHTML}
+      <div>
+        <h2><b>Apex</b> Learning Academy</h2>
+        <p>Year 7 Maths &amp; English · Victorian Curriculum</p>
+      </div>
+    </div>
     <div class="page-head">
       <h1>${greet}, ${esc(me.name)}</h1>
       <p>Pick up where you left off, or try something new.</p>
