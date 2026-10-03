@@ -42,10 +42,6 @@
     <path d="M 200 338 C 226 321 268 317 304 325 L 304 386 C 268 378 226 382 200 400" fill="url(#gold)"/>
     <path d="M 200 330 C 175 313 135 309 102 316 L 102 376 C 135 369 175 373 200 390" fill="#FFFFFF"/>
     <path d="M 200 330 C 225 313 265 309 298 316 L 298 376 C 265 369 225 373 200 390" fill="#E6EFF1"/>
-    <g fill="none" stroke="#9FC3C8" stroke-width="2" stroke-linecap="round">
-      <path d="M 188 340 C 168 329 140 326 114 331"/><path d="M 188 352 C 168 341 140 338 114 343"/><path d="M 188 364 C 168 353 140 350 114 355"/>
-      <path d="M 212 340 C 232 329 260 326 286 331"/><path d="M 212 352 C 232 341 260 338 286 343"/><path d="M 212 364 C 232 353 260 350 286 355"/>
-    </g>
     <path d="M 200 330 V 390" stroke="#B9D2D6" stroke-width="2.2"/></g>
   <g transform="translate(32 12.4) scale(0.118)">
     <path d="M-74 26 C-74 50 74 50 74 26 V6 H-74 Z" fill="#0D1628" stroke="url(#gold)" stroke-width="7"/>
