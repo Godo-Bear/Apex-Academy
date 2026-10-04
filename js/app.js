@@ -522,19 +522,44 @@ async function latestAnnouncement() {
   return (data || [])[0] || null;
 }
 
+// Announcements never interrupt: they slide in at the top and fade away.
+// While a test is running (leaveWarning is set) they wait until it's finished.
+let pendingAnnouncement = null;
+
 async function checkAnnouncement(next = () => {}) {
+  next(); // never hold up other notices
   const a = await latestAnnouncement();
-  if (!a || store(announceSeenKey()) === a.id) return next();
-  $("#announce-text").textContent = a.message;
-  $("#announce-date").textContent = `📢 Announcement · ${fmtDate(a.created_at)}`;
-  show($("#modal-announce"));
-  $("#announce-ok").onclick = () => { store(announceSeenKey(), a.id); hide($("#modal-announce")); next(); };
+  if (!a || store(announceSeenKey()) === a.id) return;
+  if (leaveWarning) { pendingAnnouncement = a; return; }
+  showAnnouncementPop(a);
+}
+
+function flushPendingAnnouncement() {
+  if (pendingAnnouncement && !leaveWarning) {
+    const a = pendingAnnouncement;
+    pendingAnnouncement = null;
+    setTimeout(() => showAnnouncementPop(a), 800);
+  }
+}
+
+function showAnnouncementPop(a) {
+  store(announceSeenKey(), a.id);
+  $("#announce-pop")?.remove();
+  const el = document.createElement("div");
+  el.id = "announce-pop";
+  el.setAttribute("role", "status");
+  el.innerHTML = `
+    <button class="announce-x" aria-label="Close">✕</button>
+    <div class="announce-label">📢 Announcement · ${fmtDate(a.created_at)}</div>
+    <div class="announce-big">${esc(a.message)}</div>`;
+  document.body.appendChild(el);
+  const close = () => { el.classList.add("out"); setTimeout(() => el.remove(), 400); };
+  $(".announce-x", el).addEventListener("click", close);
+  setTimeout(close, 12000);
 }
 
 // Pick up new announcements for people who keep the site open.
-setInterval(() => {
-  if (me && !$$(".modal").some((m) => !m.classList.contains("hidden"))) checkAnnouncement();
-}, 5 * 60 * 1000);
+setInterval(() => { if (me) checkAnnouncement(); }, 5 * 60 * 1000);
 
 function showTermsChanged(next) {
   $("#terms-changes").innerHTML = TERMS_CHANGES.map((c) => `<li>${esc(c)}</li>`).join("");
@@ -586,6 +611,7 @@ window.addEventListener("beforeunload", (e) => { if (leaveWarning) { e.preventDe
 function route() {
   if (cleanup) { cleanup(); cleanup = null; }
   leaveWarning = null;
+  flushPendingAnnouncement();
   lastHash = location.hash;
   const [page = "home", arg] = location.hash.replace(/^#\/?/, "").split("/");
   const view = $("#view");
@@ -1890,6 +1916,7 @@ function runTest(view, items, minutes) {
   function finish() {
     clearInterval(timer);
     leaveWarning = null;
+    flushPendingAnnouncement();
     const answers = items.map(({ q }) => $(`input[data-qid="${q.id}"]`, form).value);
     const results = items.map(({ q, topic }, i) => ({ q, topic, correct: isAnswerCorrect(q, answers[i]) }));
     const right = results.filter((r) => r.correct).length;

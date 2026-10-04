@@ -362,3 +362,15 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
 .announce-banner { background: linear-gradient(120deg, var(--warm), #E3963E); color: #1B1205; border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px; }
 .announce-banner .muted { color: rgba(27, 18, 5, .7); }
 .announce-banner .announce-big { font-size: clamp(18px, 3vw, 24px); }
+#announce-pop {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  width: min(620px, calc(100% - 32px)); z-index: 70;
+  background: linear-gradient(120deg, var(--warm), #E3963E); color: #1B1205;
+  border-radius: 14px; padding: 16px 48px 18px 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  animation: announce-in .35s ease-out;
+}
+#announce-pop.out { opacity: 0; transform: translate(-50%, -12px); transition: opacity .35s, transform .35s; }
+#announce-pop .announce-label { font-size: 12px; font-weight: 600; opacity: .75; margin-bottom: 4px; }
+#announce-pop .announce-big { font-size: clamp(20px, 3.4vw, 28px); }
+.announce-x { position: absolute; top: 10px; right: 10px; border: 0; background: rgba(0, 0, 0, .12); color: inherit; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 14px; }
+@keyframes announce-in { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
