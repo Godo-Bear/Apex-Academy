@@ -272,13 +272,13 @@ async function loadMyFeedback() {
 document.addEventListener("click", (e) => {
   const opener = e.target.closest("[data-open]");
   if (opener) { e.preventDefault(); openModal(opener.dataset.open); return; }
-  if (e.target.closest("[data-close]") || e.target.classList.contains("modal")) {
+  if (e.target.closest("[data-close]") || (e.target.classList.contains("modal") && !e.target.dataset.sticky)) {
     const modal = e.target.closest(".modal");
     if (modal) hide(modal);
   }
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") $$(".modal").forEach(hide);
+  if (e.key === "Escape") $$(".modal:not([data-sticky])").forEach(hide);
 });
 $("#menu-admin").addEventListener("click", () => hide($("#modal-menu")));
 
@@ -330,6 +330,7 @@ $("#auth-form").addEventListener("submit", async (e) => {
     if (authMode === "signup") {
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) throw error;
+      store(`apex-terms-seen-${email}`, TERMS_VERSION);
       if (data.session && data.user) {
         await sb.from("profiles").insert({ id: data.user.id, email, username: name, has_paid: false, agreed_to_terms: true });
         await handleAuthenticatedUser(data.user);
@@ -422,6 +423,7 @@ async function handleAuthenticatedUser(user) {
     progress: profile.progress || {},
     friends: profile.friends || [],
     isAdmin: !!profile.is_admin,
+    paidUntil: profile.paid_until || null,
   };
   await loadCustomQuestions();
   enterApp();
@@ -457,6 +459,60 @@ function enterApp() {
   renderMeBox();
   showScreen("app");
   route();
+  showLoginNotices();
+}
+
+// ---------------- Login notices ----------------
+// When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
+// Everyone then sees the "terms have changed" pop-up once and must agree.
+const TERMS_VERSION = "2026-10-04";
+const TERMS_CHANGES = [
+  "Access is now $15 AUD every 6 months.",
+  "Payment is cash in hand only, paid to the site owner.",
+  "Accounts are unlocked by hand, so it may take a while after paying.",
+  "New section on renewing after 6 months.",
+  "No refunds, including if you stop using the site early.",
+];
+const RENEW_WARNING_DAYS = 14;
+const termsKey = () => `apex-terms-seen-${authUser.id}`;
+
+function showLoginNotices() {
+  const queue = [];
+  const seen = store(termsKey()) || store(`apex-terms-seen-${authUser.email}`);
+  if (seen !== TERMS_VERSION) queue.push(showTermsChanged);
+  if (me.paidUntil) {
+    const daysLeft = Math.ceil((new Date(me.paidUntil) - new Date()) / 86400000);
+    const shownKey = `apex-renew-shown-${authUser.id}`;
+    if (daysLeft > 0 && daysLeft <= RENEW_WARNING_DAYS && store(shownKey) !== todayStr()) {
+      queue.push((next) => { store(shownKey, todayStr()); showRenewReminder(daysLeft, next); });
+    }
+  }
+  const run = () => { const fn = queue.shift(); if (fn) fn(run); };
+  run();
+}
+
+function showTermsChanged(next) {
+  $("#terms-changes").innerHTML = TERMS_CHANGES.map((c) => `<li>${esc(c)}</li>`).join("");
+  show($("#modal-terms-update"));
+  $("#terms-agree").onclick = () => {
+    store(termsKey(), TERMS_VERSION);
+    hide($("#modal-terms-update"));
+    next();
+  };
+  $("#terms-read").onclick = () => {
+    hide($("#modal-terms-update"));
+    show($("#modal-terms"));
+    // come back to the agree pop-up when the full terms are closed
+    const back = () => { if ($("#modal-terms").classList.contains("hidden")) { show($("#modal-terms-update")); clearInterval(t); } };
+    const t = setInterval(back, 300);
+  };
+}
+
+function showRenewReminder(daysLeft, next) {
+  const date = new Date(me.paidUntil).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+  $("#renew-text").innerHTML = `Your access ends in <strong>${daysLeft} day${daysLeft === 1 ? "" : "s"}</strong> (on ${esc(date)}).`;
+  show($("#modal-renew"));
+  $("#renew-ok").onclick = () => { hide($("#modal-renew")); next(); };
 }
 
 function renderMeBox() {
