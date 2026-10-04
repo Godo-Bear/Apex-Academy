@@ -351,9 +351,4 @@ details[open] summary { margin-bottom: 4px; }
 #me-stats-mobile { white-space: nowrap; }
 @media (max-width: 400px) { .mobile-top .wm-rest { display: none; } }
 
-.terms-box { margin: 0 4px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-size: 13px; }
-.terms-box ul { margin: 6px 0; padding-left: 18px; }
-.terms-box li { margin: 2px 0; }
-.terms-box b { color: var(--bad); }
-.terms-box a { font-weight: 600; text-decoration: none; }
 .terms-refund { background: var(--bad-soft); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
