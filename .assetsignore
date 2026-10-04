@@ -1,0 +1,11 @@
+# Files Cloudflare should not put online
+.git
+.github
+node_modules
+legacy
+supabase
+CLAUDE.md
+README.md
+wrangler.jsonc
+.assetsignore
+.wrangler
