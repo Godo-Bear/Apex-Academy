@@ -465,14 +465,15 @@ function enterApp() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-04";
+const TERMS_VERSION = "2026-10-04b";
 const TERMS_CHANGES = [
-  "Access is now $15 AUD every 6 months.",
-  "Payment is cash in hand only, paid to the site owner.",
-  "Accounts are unlocked by hand, so it may take a while after paying.",
-  "New section on renewing after 6 months.",
-  "No refunds, including if you stop using the site early.",
-];
+  "Access is $15 AUD every 6 months, paid cash in hand to the site owner.",
+  "Accounts are unlocked by hand, so it may take a while after paying. No refunds.",
+  "Using the AI: it's for learning. Don't hand in AI-written work as your own.",
+  "Behaviour: be respectful, or your account may be suspended.",
+  "Safety and privacy: under 18s need a parent or guardian's OK; you can ask for your data to be deleted.",
+  "No guarantees: practice doesn't guarantee marks, and the site may sometimes be down for updates.",
+]
 const RENEW_WARNING_DAYS = 14;
 const termsKey = () => `apex-terms-seen-${authUser.id}`;
 
