@@ -26,6 +26,13 @@ To add or edit questions, change `js/data.js`. Questions in the `custom_question
 - **Progress**: XP rank and rank list, mastery by topic, leaderboard (everyone / friends)
 - **Admin** (only for `is_admin` accounts): site stats; per account add/set points and XP, renew 6 months, make/remove admin, reset progress, kick/unkick, delete; reply to, resolve and clear feedback; bulk-import questions
 
+## Where it's hosted
+
+- Cloudflare Workers: https://apex-academy.jaydennarayan5.workers.dev (settings in `wrangler.jsonc`; `.assetsignore` keeps non-site files offline)
+- GitHub Pages: https://godo-bear.github.io/Apex-Academy/
+
+Both update automatically from the `main` branch.
+
 ## Running locally
 
 It's a static site, so open `index.html` or serve the folder, for example `npx serve .`.
