@@ -511,8 +511,7 @@ function showLoginNotices() {
 }
 
 // ---------------- Announcements ----------------
-// The admin's latest active announcement shows once to each user as a big pop-up,
-// and as a banner on Home while it's active. Needs supabase/announcements.sql.
+// The admin's latest active announcement shows once to each user as a big slide-in message. Needs supabase/announcements.sql.
 const announceSeenKey = () => `apex-announce-seen-${authUser.id}`;
 
 async function latestAnnouncement() {
@@ -649,7 +648,6 @@ function pageHome(view) {
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   view.innerHTML = `
-    <div id="home-announce"></div>
     <div class="card brand-hero">
       ${$("#crest-tpl").innerHTML}
       <div>
@@ -689,11 +687,6 @@ function pageHome(view) {
       ${quickCard("#/tutor", "🤖", "Ask the tutor", "Stuck? Get a friendly explanation.")}
     </div>
   `;
-
-  latestAnnouncement().then((a) => {
-    const box = $("#home-announce", view);
-    if (box && a) box.innerHTML = `<div class="announce-banner"><span class="muted small">📢 Announcement · ${fmtDate(a.created_at)}</span><div class="announce-big">${esc(a.message)}</div></div>`;
-  });
 
   // Top 5, plus your own place if you're further down.
   loadLeaderboard().then((rows) => {
@@ -2277,7 +2270,7 @@ function pageAdmin(view) {
 
     <div class="section-label">📢 Announcements</div>
     <div class="card stack">
-      <p class="muted small" style="margin:0;">Send a message to everyone. It pops up in big, bold text the next time each person opens the site, and shows at the top of Home until you remove it.</p>
+      <p class="muted small" style="margin:0;">Send a message to everyone. It slides in once at the top of the screen in big, bold text for each person (after they finish any test they're doing). Remove it to stop people who haven't seen it yet from getting it.</p>
       <textarea id="ann-text" maxlength="300" rows="2" style="min-height:70px;" placeholder="e.g. No school holidays break — new questions added this week!"></textarea>
       <div class="row"><button class="btn" id="ann-send">Send to everyone</button><span class="small muted" id="ann-status"></span></div>
       <div id="ann-list"></div>
