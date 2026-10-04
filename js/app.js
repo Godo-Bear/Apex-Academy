@@ -482,12 +482,13 @@ function enterApp() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-04b";
+const TERMS_VERSION = "2026-10-04c";
 const TERMS_CHANGES = [
   "Access is $15 AUD every 6 months, paid cash in hand to the site owner.",
   "Accounts are unlocked by hand, so it may take a while after paying. No refunds.",
   "Using the AI: it's for learning. Don't hand in AI-written work as your own.",
   "Behaviour: be respectful, or your account may be suspended.",
+  "Leaderboard: if you hide your points, your name is hidden too (you show as 'Hidden player').",
   "Safety and privacy: under 18s need a parent or guardian's OK; you can ask for your data to be deleted.",
   "No guarantees: practice doesn't guarantee marks, and the site may sometimes be down for updates.",
 ]
@@ -624,6 +625,9 @@ function route() {
 }
 
 // ---------------- Leaderboard data ----------------
+// People who hide their points are shown to others as "Hidden player" (name and points).
+const lbHidden = (r, isMe) => !isMe && r.show_points === false;
+const lbName = (r, isMe) => (lbHidden(r, isMe) ? "🙈 Hidden player" : esc(r.username) + (isMe ? " (you)" : ""));
 async function loadLeaderboard() {
   let { data, error } = await sb.from("public_profiles").select("username, points, show_points, deleted").order("points", { ascending: false }).limit(100);
   if (error) ({ data, error } = await sb.from("public_profiles").select("username, points, show_points").order("points", { ascending: false }).limit(100));
@@ -703,7 +707,7 @@ function pageHome(view) {
       return `${gap ? `<div class="muted small" style="text-align:center; padding:2px 0;">⋯</div>` : ""}
         <div class="list-row ${isMe ? "me" : ""}">
           <span class="rank">${medal(i)}</span>
-          <span class="grow">${esc(r.username)}${isMe ? " (you)" : ""}</span>
+          <span class="grow ${lbHidden(r, isMe) ? "muted" : ""}">${lbName(r, isMe)}</span>
           <span class="muted small">${pts}</span>
         </div>`;
     }).join("");
@@ -2087,7 +2091,7 @@ function pageProgress(view) {
       const pts = isMe ? me.points : r.show_points === false ? "hidden" : `${r.points || 0} pts`;
       return `<div class="list-row ${isMe ? "me" : ""}">
         <span class="rank">${i + 1}</span>
-        <span class="grow">${esc(r.username)}${isMe ? " (you)" : ""}</span>
+        <span class="grow ${lbHidden(r, isMe) ? "muted" : ""}">${lbName(r, isMe)}</span>
         <span class="muted small">${isMe ? pts + " pts" : pts}</span>
         ${mode === "friends" && !isMe ? `<button class="btn ghost sm" data-unfriend="${esc(r.username)}" title="Remove friend">✕</button>` : ""}
       </div>`;
@@ -2181,7 +2185,7 @@ function pageSettings(view) {
     <div class="section-label">Privacy</div>
     <div class="card stack">
       <label class="row between" style="cursor:pointer;">
-        <span>Show my points on the leaderboard<br><span class="muted small">Your name still shows; your points say "hidden" to others.</span></span>
+        <span>Show me on the leaderboard<br><span class="muted small">If you turn this off, other people see "Hidden player" instead of your name and points.</span></span>
         <input type="checkbox" id="set-showpoints" ${me.showPoints ? "checked" : ""} style="width:20px; height:20px;">
       </label>
     </div>
@@ -2234,7 +2238,7 @@ function pageSettings(view) {
     const { error } = await sb.from("profiles").update({ show_points: e.target.checked }).eq("id", authUser.id);
     if (error) { e.target.checked = !e.target.checked; return toast("Couldn't save that."); }
     me.showPoints = e.target.checked;
-    toast(e.target.checked ? "Your points are visible" : "Your points are hidden");
+    toast(e.target.checked ? "You're visible on the leaderboard" : "Your name and points are hidden");
   });
 
   $("#req-delete", view).addEventListener("click", () => {
