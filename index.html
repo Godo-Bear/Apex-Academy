@@ -8,12 +8,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261003a">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261004a">
 <!-- Home-screen icon: iPhone/iPad use apple-touch-icon, Android uses the manifest -->
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261003a">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261004a">
 <meta name="apple-mobile-web-app-title" content="Apex Academy">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/styles.css?v=20261003a">
+<link rel="stylesheet" href="css/styles.css?v=20261004a">
 <script>
   // Apply the saved theme before first paint to avoid a flash.
   try { const t = localStorage.getItem("apex-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
@@ -22,10 +22,10 @@
 <body>
 
 <template id="logo-tpl">
-  <img class="logo-mark" src="assets/logo.svg?v=20261003a" alt="">
+  <img class="logo-mark" src="assets/logo.svg?v=20261004a" alt="">
 </template>
 <template id="crest-tpl">
-  <img class="logo-crest" src="assets/crest.svg?v=20261003a" alt="">
+  <img class="logo-crest" src="assets/crest.svg?v=20261004a" alt="">
 </template>
 
 <!-- Loading -->
@@ -61,7 +61,10 @@
         <div id="auth-msg" class="hidden"></div>
         <button type="submit" id="auth-submit" class="btn block">Log in</button>
       </form>
-      <button type="button" id="forgot-link" class="btn ghost small" style="margin-top:8px;">Forgot password?</button>
+      <div class="row between" style="margin-top:8px;">
+        <button type="button" id="forgot-link" class="btn ghost small">Forgot password?</button>
+        <a href="#" class="small" data-open="terms">Terms &amp; Conditions</a>
+      </div>
     </div>
 
     <form id="forgot-form" class="hidden">
@@ -86,7 +89,8 @@
   <div class="card auth-card" style="text-align:center;">
     <div class="logo logo-stack" data-logo><span class="wordmark"><b>Apex</b> Learning Academy</span></div>
     <h2 style="margin-top:20px;">Almost there</h2>
-    <p class="muted">Your account (<strong id="paywall-email"></strong>) isn't active yet. Contact the site owner to arrange payment, then check again.</p>
+    <p class="muted">Your account (<strong id="paywall-email"></strong>) isn't active yet. Access is <strong>$15 for 6 months, paid cash in hand</strong> to the site owner. Once they've switched your account on, check again.</p>
+    <p class="small"><a href="#" data-open="terms">Terms &amp; Conditions</a></p>
     <button id="paywall-recheck" class="btn block">I've paid — check again</button>
     <button id="paywall-logout" class="btn ghost" style="margin-top:8px;">Log out</button>
   </div>
@@ -101,6 +105,7 @@
       <div class="me-box"><strong id="me-name"></strong><span class="muted" id="me-rank" style="display:block;"></span><span class="muted" id="me-stats"></span></div>
       <button class="nav-link" id="theme-toggle"><span class="ico">◐</span><span>Theme</span></button>
       <button class="nav-link" data-open="feedback"><span class="ico">💬</span><span>Feedback</span></button>
+      <button class="nav-link" data-open="terms"><span class="ico">📄</span><span>Terms</span></button>
       <button class="nav-link" id="logout"><span class="ico">⏻</span><span>Log out</span></button>
     </div>
   </aside>
@@ -152,21 +157,22 @@
   <div class="card stack" style="max-width:560px;">
     <div class="row between"><h2 style="margin:0;">Terms &amp; Conditions</h2><button class="btn ghost" data-close>✕</button></div>
     <div class="small muted" style="max-height:60vh; overflow-y:auto;">
-      <p><strong>1. What this is.</strong> Apex Learning Academy is a paid maths practice tool covering the Year 7 Victorian Curriculum. Access requires a payment of <strong>$10 AUD every 6 months</strong> per account, paid in cash notes.</p>
-      <p><strong>2. Payment.</strong> Payment grants a single-user licence to one account for a 6 month period. Payment is made in cash notes, arranged directly with the site owner, and is not automatically processed on this site.</p>
-      <p><strong>3. Refunds.</strong> All payments are final. No refunds will be given once payment has been made.</p>
-      <p><strong>4. Accounts.</strong> You are responsible for keeping your password private. Accounts may not be shared or resold. Apex Learning Academy reserves the right to suspend accounts found to be in breach of these terms.</p>
-      <p><strong>5. Content.</strong> Practice questions are provided for study purposes and, while checked for accuracy, are not officially affiliated with or endorsed by any curriculum authority or textbook publisher.</p>
-      <p><strong>6. Data.</strong> We store your email, username, and in-app progress (points, practice history) to operate the service. We do not sell your data to third parties.</p>
-      <p><strong>7. Changes.</strong> These terms may be updated from time to time. Continued use of the site after changes constitutes acceptance of the new terms.</p>
-      <p><strong>8. Contact.</strong> Questions about these terms can be sent via Feedback.</p>
+      <p><strong>1. What this is.</strong> Apex Learning Academy is a paid maths and English practice site covering the Year 7 Victorian Curriculum. Access costs <strong>$15 AUD every 6 months</strong> per account.</p>
+      <p><strong>2. Payment.</strong> Payment is <strong>cash in hand only</strong>, paid directly to the site owner. No card, bank transfer or online payments are accepted, and nothing is charged through this website. Your account is switched on once the owner has received your cash, and stays active for 6 months from that date.</p>
+      <p><strong>3. Renewing.</strong> To keep using the site after 6 months, pay another $15 cash in hand. If you don't renew, your account is paused until you do; your progress is kept.</p>
+      <p><strong>4. Refunds.</strong> All payments are final. No refunds will be given once payment has been made.</p>
+      <p><strong>5. Accounts.</strong> You are responsible for keeping your password private. Accounts may not be shared or resold. Apex Learning Academy reserves the right to suspend accounts found to be in breach of these terms.</p>
+      <p><strong>6. Content.</strong> Practice questions are provided for study purposes and, while checked for accuracy, are not officially affiliated with or endorsed by any curriculum authority or textbook publisher.</p>
+      <p><strong>7. Data.</strong> We store your email, username, and in-app progress (points, practice history) to operate the service. We do not sell your data to third parties.</p>
+      <p><strong>8. Changes.</strong> These terms may be updated from time to time. Continued use of the site after changes constitutes acceptance of the new terms.</p>
+      <p><strong>9. Contact.</strong> Questions about these terms can be sent via Feedback.</p>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/data.js?v=20261003a"></script>
-<script src="js/lessons.js?v=20261003a"></script>
-<script src="js/app.js?v=20261003a"></script>
+<script src="js/data.js?v=20261004a"></script>
+<script src="js/lessons.js?v=20261004a"></script>
+<script src="js/app.js?v=20261004a"></script>
 </body>
 </html>

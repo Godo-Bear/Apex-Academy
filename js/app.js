@@ -497,6 +497,14 @@ function route() {
   window.scrollTo(0, 0);
 }
 
+// ---------------- Leaderboard data ----------------
+async function loadLeaderboard() {
+  let { data, error } = await sb.from("public_profiles").select("username, points, show_points, deleted").order("points", { ascending: false }).limit(100);
+  if (error) ({ data, error } = await sb.from("public_profiles").select("username, points, show_points").order("points", { ascending: false }).limit(100));
+  if (error) throw error;
+  return (data || []).filter((r) => r.username && !r.deleted);
+}
+
 // ---------------- Home ----------------
 function suggestTopic() {
   const attempted = QUIZ_TOPICS.filter((t) => topicStats(t.id).attempted >= 5);
@@ -541,6 +549,11 @@ function pageHome(view) {
       <a class="btn" href="#/practice/${topic.id}">Practise →</a>
     </div>
 
+    <div class="section-label row between" style="margin-bottom:10px;">
+      <span>🏆 Leaderboard</span><a class="btn ghost sm" href="#/progress">See all →</a>
+    </div>
+    <div class="card" id="home-lb"><p class="muted" style="margin:0;">Loading…</p></div>
+
     <div class="section-label">Jump in</div>
     <div class="grid topics">
       ${quickCard("#/practice", "📚", "Practice", "Work through topics at your own pace.")}
@@ -548,6 +561,30 @@ function pageHome(view) {
       ${quickCard("#/tutor", "🤖", "Ask the tutor", "Stuck? Get a friendly explanation.")}
     </div>
   `;
+
+  // Top 5, plus your own place if you're further down.
+  loadLeaderboard().then((rows) => {
+    const box = $("#home-lb", view);
+    if (!box) return;
+    if (!rows.length) { box.innerHTML = `<p class="muted" style="margin:0;">No one on the leaderboard yet.</p>`; return; }
+    const myIndex = rows.findIndex((r) => r.username === me.name);
+    const shown = rows.slice(0, 5).map((r, i) => ({ r, i }));
+    if (myIndex >= 5) shown.push({ r: rows[myIndex], i: myIndex, gap: true });
+    const medal = (i) => ["🥇", "🥈", "🥉"][i] || String(i + 1);
+    box.innerHTML = shown.map(({ r, i, gap }) => {
+      const isMe = i === myIndex;
+      const pts = isMe ? `${me.points} pts` : r.show_points === false ? "hidden" : `${r.points || 0} pts`;
+      return `${gap ? `<div class="muted small" style="text-align:center; padding:2px 0;">⋯</div>` : ""}
+        <div class="list-row ${isMe ? "me" : ""}">
+          <span class="rank">${medal(i)}</span>
+          <span class="grow">${esc(r.username)}${isMe ? " (you)" : ""}</span>
+          <span class="muted small">${pts}</span>
+        </div>`;
+    }).join("");
+  }).catch(() => {
+    const box = $("#home-lb", view);
+    if (box) box.innerHTML = `<p class="muted" style="margin:0;">Couldn't load the leaderboard.</p>`;
+  });
 }
 function rankCard() {
   const { current, next, pct } = levelInfo(me.xp, me.isAdmin);
@@ -1952,10 +1989,8 @@ function pageProgress(view) {
   });
 
   (async () => {
-    let { data, error } = await sb.from("public_profiles").select("username, points, show_points, deleted").order("points", { ascending: false }).limit(100);
-    if (error) ({ data, error } = await sb.from("public_profiles").select("username, points, show_points").order("points", { ascending: false }).limit(100));
-    if (error) { $("#lb", view).innerHTML = `<p class="muted">Couldn't load the leaderboard.</p>`; return; }
-    rows = (data || []).filter((r) => r.username && !r.deleted);
+    try { rows = await loadLeaderboard(); }
+    catch (e) { $("#lb", view).innerHTML = `<p class="muted">Couldn't load the leaderboard.</p>`; return; }
     drawBoard();
   })();
 }
