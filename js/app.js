@@ -12,7 +12,14 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ---------------- Constants ----------------
 const DIFF_POINTS = { 1: 10, 2: 20, 3: 30 };
 const DIFF_NAMES = { 1: "Easy", 2: "Medium", 3: "Hard" };
-const PRACTICE_SET_SIZE = 5;
+// Device preferences set on the Settings page.
+const PREFS_KEY = "apex-prefs";
+const prefs = () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch (e) { return {}; } };
+function setPref(key, value) {
+  const p = prefs(); p[key] = value;
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch (e) {}
+}
+const practiceSetSize = () => [5, 10, 15].includes(prefs().setSize) ? prefs().setSize : 5;
 
 // XP ranks — XP is earned alongside points and never spent.
 const XP_LEVELS = [
@@ -96,6 +103,9 @@ const hide = (el) => el.classList.add("hidden");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const yesterdayStr = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+// Dates are shown day/month/year, e.g. 13/11/2026.
+const fmtDate = (d) => new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "2-digit", year: "numeric" });
+const fmtDateTime = (d) => `${fmtDate(d)} ${new Date(d).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}`;
 
 function shuffle(arr) {
   const a = [...arr];
@@ -247,7 +257,12 @@ function toggleTheme() {
   root.dataset.theme = next;
   try { localStorage.setItem("apex-theme", next); } catch (e) {}
 }
-$("#theme-toggle").addEventListener("click", toggleTheme);
+function setTheme(mode) { // "light" | "dark" | "system"
+  const root = document.documentElement;
+  if (mode === "system") { delete root.dataset.theme; try { localStorage.removeItem("apex-theme"); } catch (e) {} }
+  else { root.dataset.theme = mode; try { localStorage.setItem("apex-theme", mode); } catch (e) {} }
+}
+const currentThemeSetting = () => { try { return localStorage.getItem("apex-theme") || "system"; } catch (e) { return "system"; } };
 $("#theme-toggle-m").addEventListener("click", toggleTheme);
 
 // ---------------- Modals ----------------
@@ -264,7 +279,7 @@ async function loadMyFeedback() {
   if (error || !data?.length) { box.innerHTML = ""; return; }
   box.innerHTML = `<div class="section-label" style="margin-top:8px;">Your messages</div>` + data.map((f) => `
     <div class="list-row" style="display:block;">
-      <div class="row between"><span class="tag ${f.completed ? "good" : ""}">${f.completed ? "Resolved" : "Pending"}</span><span class="muted small">${new Date(f.created_at).toLocaleDateString()}</span></div>
+      <div class="row between"><span class="tag ${f.completed ? "good" : ""}">${f.completed ? "Resolved" : "Pending"}</span><span class="muted small">${fmtDate(f.created_at)}</span></div>
       <div class="small" style="margin-top:4px; white-space:pre-wrap;">${esc(f.message)}</div>
       ${f.admin_reply ? `<div class="explain"><strong>Reply:</strong> ${esc(f.admin_reply)}</div>` : ""}
     </div>`).join("");
@@ -281,6 +296,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") $$(".modal:not([data-sticky])").forEach(hide);
 });
 $("#menu-admin").addEventListener("click", () => hide($("#modal-menu")));
+$("#menu-settings").addEventListener("click", () => hide($("#modal-menu")));
 
 $("#feedback-send").addEventListener("click", async () => {
   const message = $("#feedback-message").value.trim();
@@ -398,7 +414,7 @@ $("#paywall-recheck").addEventListener("click", async () => {
 async function handleAuthenticatedUser(user) {
   authUser = { id: user.id, email: user.email };
   let { data: profile, error } = await sb.from("profiles")
-    .select("username, has_paid, paid_until, points, xp, test_points, progress, friends, is_admin")
+    .select("username, has_paid, paid_until, points, xp, test_points, progress, friends, is_admin, show_points")
     .eq("id", user.id).single();
   if (error && error.code !== "PGRST116") {
     // Older databases may not have test_points yet.
@@ -424,6 +440,7 @@ async function handleAuthenticatedUser(user) {
     friends: profile.friends || [],
     isAdmin: !!profile.is_admin,
     paidUntil: profile.paid_until || null,
+    showPoints: profile.show_points !== false,
   };
   await loadCustomQuestions();
   enterApp();
@@ -481,6 +498,7 @@ function showLoginNotices() {
   const queue = [];
   const seen = store(termsKey()) || store(`apex-terms-seen-${authUser.email}`);
   if (seen !== TERMS_VERSION) queue.push(showTermsChanged);
+  queue.push((next) => checkAnnouncement(next));
   if (me.paidUntil) {
     const daysLeft = Math.ceil((new Date(me.paidUntil) - new Date()) / 86400000);
     const shownKey = `apex-renew-shown-${authUser.id}`;
@@ -491,6 +509,32 @@ function showLoginNotices() {
   const run = () => { const fn = queue.shift(); if (fn) fn(run); };
   run();
 }
+
+// ---------------- Announcements ----------------
+// The admin's latest active announcement shows once to each user as a big pop-up,
+// and as a banner on Home while it's active. Needs supabase/announcements.sql.
+const announceSeenKey = () => `apex-announce-seen-${authUser.id}`;
+
+async function latestAnnouncement() {
+  const { data, error } = await sb.from("announcements").select("id, message, created_at").eq("active", true)
+    .order("created_at", { ascending: false }).limit(1);
+  if (error) return null; // table not set up yet
+  return (data || [])[0] || null;
+}
+
+async function checkAnnouncement(next = () => {}) {
+  const a = await latestAnnouncement();
+  if (!a || store(announceSeenKey()) === a.id) return next();
+  $("#announce-text").textContent = a.message;
+  $("#announce-date").textContent = `📢 Announcement · ${fmtDate(a.created_at)}`;
+  show($("#modal-announce"));
+  $("#announce-ok").onclick = () => { store(announceSeenKey(), a.id); hide($("#modal-announce")); next(); };
+}
+
+// Pick up new announcements for people who keep the site open.
+setInterval(() => {
+  if (me && !$$(".modal").some((m) => !m.classList.contains("hidden"))) checkAnnouncement();
+}, 5 * 60 * 1000);
 
 function showTermsChanged(next) {
   $("#terms-changes").innerHTML = TERMS_CHANGES.map((c) => `<li>${esc(c)}</li>`).join("");
@@ -510,7 +554,7 @@ function showTermsChanged(next) {
 }
 
 function showRenewReminder(daysLeft, next) {
-  const date = new Date(me.paidUntil).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+  const date = fmtDate(me.paidUntil);
   $("#renew-text").innerHTML = `Your access ends in <strong>${daysLeft} day${daysLeft === 1 ? "" : "s"}</strong> (on ${esc(date)}).`;
   show($("#modal-renew"));
   $("#renew-ok").onclick = () => { hide($("#modal-renew")); next(); };
@@ -545,7 +589,7 @@ function route() {
   lastHash = location.hash;
   const [page = "home", arg] = location.hash.replace(/^#\/?/, "").split("/");
   const view = $("#view");
-  const pages = { home: pageHome, practice: pagePractice, test: pageTest, tutor: pageTutor, progress: pageProgress, admin: pageAdmin };
+  const pages = { home: pageHome, practice: pagePractice, test: pageTest, tutor: pageTutor, progress: pageProgress, admin: pageAdmin, settings: pageSettings };
   const render = pages[page] || pageHome;
   const navRoute = pages[page] ? page : "home";
   $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === navRoute));
@@ -579,6 +623,7 @@ function pageHome(view) {
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   view.innerHTML = `
+    <div id="home-announce"></div>
     <div class="card brand-hero">
       ${$("#crest-tpl").innerHTML}
       <div>
@@ -618,6 +663,11 @@ function pageHome(view) {
       ${quickCard("#/tutor", "🤖", "Ask the tutor", "Stuck? Get a friendly explanation.")}
     </div>
   `;
+
+  latestAnnouncement().then((a) => {
+    const box = $("#home-announce", view);
+    if (box && a) box.innerHTML = `<div class="announce-banner"><span class="muted small">📢 Announcement · ${fmtDate(a.created_at)}</span><div class="announce-big">${esc(a.message)}</div></div>`;
+  });
 
   // Top 5, plus your own place if you're further down.
   loadLeaderboard().then((rows) => {
@@ -684,7 +734,7 @@ function pagePractice(view, topicId) {
     return t.special ? pageWriting(view, t) : pageTopic(view, t);
   }
   view.innerHTML = `
-    <div class="page-head"><h1>Practice</h1><p>Choose a topic. Each set has ${PRACTICE_SET_SIZE} questions.</p></div>
+    <div class="page-head"><h1>Practice</h1><p>Choose a topic. Each set has ${practiceSetSize()} questions.</p></div>
     ${YEAR_LEVELS.map((y) => `
       <div class="section-label">Maths · ${esc(y.label)}</div>
       <div class="grid topics">${y.topics.map(topicCard).join("")}</div>`).join("")}
@@ -807,7 +857,7 @@ function nextPracticeSet(t, difficulty) {
   const ids = new Set(pool.map((q) => q.id));
   let deck = (decks[deckId] || []).filter((id) => ids.has(id));
   const set = [];
-  while (set.length < Math.min(PRACTICE_SET_SIZE, pool.length)) {
+  while (set.length < Math.min(practiceSetSize(), pool.length)) {
     if (!deck.length) {
       // Reshuffle, keeping this set's questions out of the start of the new deck.
       const taken = new Set(set.map((q) => q.id));
@@ -1602,7 +1652,7 @@ Tutor:`;
       const s = p.settings || {};
       const words = countWords(writingText(p));
       const bits = [
-        new Date(p.updatedAt || p.createdAt).toLocaleDateString(),
+        fmtDate(p.updatedAt || p.createdAt),
         `${words} word${words === 1 ? "" : "s"}${s.target ? ` / ${s.target}` : ""}`,
         isEssay && s.essayType ? `${(ESSAY_TYPES[s.essayType] || {}).label}${s.side === "for" ? " (for)" : s.side === "against" ? " (against)" : ""} · ${s.paragraphs} body ¶` : "",
       ].filter(Boolean);
@@ -2052,6 +2102,134 @@ function pageProgress(view) {
   })();
 }
 
+// ---------------- Settings ----------------
+function pageSettings(view) {
+  const until = me.paidUntil ? new Date(me.paidUntil) : null;
+  const daysLeft = until ? Math.ceil((until - new Date()) / 86400000) : null;
+  const subText = me.isAdmin && !until
+    ? "Admin account."
+    : until
+      ? (daysLeft > 0
+        ? `Active until <strong>${esc(fmtDate(until))}</strong> (${daysLeft} day${daysLeft === 1 ? "" : "s"} left).`
+        : "Your access has ended.")
+      : "Active.";
+  const choice = (name, options, current) => `
+    <div class="segmented" data-choice="${name}">
+      ${options.map(([v, label]) => `<button type="button" data-v="${v}" class="${String(v) === String(current) ? "active" : ""}">${label}</button>`).join("")}
+    </div>`;
+
+  view.innerHTML = `
+    <div class="page-head"><h1>⚙️ Settings</h1><p>Your account, how the site looks, and more.</p></div>
+
+    <div class="section-label">Account</div>
+    <div class="card stack">
+      <div class="muted small">Logged in as <strong>${esc(authUser.email)}</strong></div>
+      <div>
+        <label class="field" for="set-name">Display name</label>
+        <div class="row" style="flex-wrap:nowrap;">
+          <input type="text" id="set-name" maxlength="24" value="${esc(me.name)}">
+          <button class="btn secondary" id="save-name">Save</button>
+        </div>
+        <div class="muted small" style="margin-top:4px;">This is shown on the leaderboard. Friends who added you by your old name will need to add you again.</div>
+      </div>
+      <div>
+        <label class="field" for="set-pass">New password</label>
+        <div class="row" style="flex-wrap:nowrap;">
+          <input type="password" id="set-pass" minlength="6" autocomplete="new-password" placeholder="At least 6 characters">
+          <button class="btn secondary" id="save-pass">Change</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">My subscription</div>
+    <div class="card stack">
+      <p style="margin:0;">${subText}</p>
+      <p class="muted small" style="margin:0;">To renew, pay <strong>$15 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so it may take a while.</p>
+    </div>
+
+    <div class="section-label">Appearance</div>
+    <div class="card stack">
+      <div class="row between"><span>Theme</span>${choice("theme", [["light", "☀️ Light"], ["dark", "🌙 Dark"], ["system", "📱 Device"]], currentThemeSetting())}</div>
+      <div class="row between"><span>Text size</span>${choice("text", [["normal", "Normal"], ["large", "Large"]], prefs().textSize || "normal")}</div>
+    </div>
+
+    <div class="section-label">Practice</div>
+    <div class="card stack">
+      <div class="row between"><span>Questions per practice set</span>${choice("setSize", [[5, "5"], [10, "10"], [15, "15"]], practiceSetSize())}</div>
+    </div>
+
+    <div class="section-label">Privacy</div>
+    <div class="card stack">
+      <label class="row between" style="cursor:pointer;">
+        <span>Show my points on the leaderboard<br><span class="muted small">Your name still shows; your points say "hidden" to others.</span></span>
+        <input type="checkbox" id="set-showpoints" ${me.showPoints ? "checked" : ""} style="width:20px; height:20px;">
+      </label>
+    </div>
+
+    <div class="section-label">Help &amp; legal</div>
+    <div class="card stack">
+      <div class="row">
+        <button class="btn secondary" data-open="terms">📄 Terms and Conditions</button>
+        <button class="btn secondary" data-open="feedback">💬 Send feedback</button>
+        <button class="btn ghost" id="req-delete">Request account deletion</button>
+      </div>
+      <button class="btn secondary" id="set-logout" style="align-self:flex-start;">⏻ Log out</button>
+    </div>`;
+
+  // segmented choices
+  $$("[data-choice]", view).forEach((group) => group.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-v]");
+    if (!btn) return;
+    $$("button", group).forEach((b) => b.classList.toggle("active", b === btn));
+    const v = btn.dataset.v;
+    if (group.dataset.choice === "theme") setTheme(v);
+    if (group.dataset.choice === "text") { setPref("textSize", v); applyTextSize(); }
+    if (group.dataset.choice === "setSize") setPref("setSize", +v);
+    toast("Saved");
+  }));
+
+  $("#save-name", view).addEventListener("click", async () => {
+    const name = $("#set-name", view).value.trim();
+    if (name === me.name) return;
+    if (name.length < 3) return toast("Display name needs at least 3 characters.");
+    const { data: taken } = await sb.from("public_profiles").select("username").eq("username", name).maybeSingle();
+    if (taken) return toast("That name is already taken.");
+    const { error } = await sb.from("profiles").update({ username: name }).eq("id", authUser.id);
+    if (error) return toast("Couldn't change your name.");
+    me.name = name;
+    renderMeBox();
+    toast("Name updated");
+  });
+
+  $("#save-pass", view).addEventListener("click", async () => {
+    const pass = $("#set-pass", view).value;
+    if (pass.length < 6) return toast("Password needs at least 6 characters.");
+    const { error } = await sb.auth.updateUser({ password: pass });
+    if (error) return toast(error.message || "Couldn't change your password.");
+    $("#set-pass", view).value = "";
+    toast("Password changed");
+  });
+
+  $("#set-showpoints", view).addEventListener("change", async (e) => {
+    const { error } = await sb.from("profiles").update({ show_points: e.target.checked }).eq("id", authUser.id);
+    if (error) { e.target.checked = !e.target.checked; return toast("Couldn't save that."); }
+    me.showPoints = e.target.checked;
+    toast(e.target.checked ? "Your points are visible" : "Your points are hidden");
+  });
+
+  $("#req-delete", view).addEventListener("click", () => {
+    openModal("feedback");
+    $("#feedback-category").value = "other";
+    $("#feedback-message").value = "Please delete my account and data.";
+  });
+  $("#set-logout", view).addEventListener("click", logout);
+}
+
+function applyTextSize() {
+  document.documentElement.dataset.text = prefs().textSize === "large" ? "large" : "normal";
+}
+applyTextSize();
+
 // ---------------- Admin ----------------
 function timeAgo(iso) {
   if (!iso) return "never";
@@ -2069,6 +2247,14 @@ function pageAdmin(view) {
   view.innerHTML = `
     <div class="page-head"><h1>Admin</h1><p>Manage accounts, feedback and questions.</p></div>
     <div class="grid cols-3" id="admin-stats"></div>
+
+    <div class="section-label">📢 Announcements</div>
+    <div class="card stack">
+      <p class="muted small" style="margin:0;">Send a message to everyone. It pops up in big, bold text the next time each person opens the site, and shows at the top of Home until you remove it.</p>
+      <textarea id="ann-text" maxlength="300" rows="2" style="min-height:70px;" placeholder="e.g. No school holidays break — new questions added this week!"></textarea>
+      <div class="row"><button class="btn" id="ann-send">Send to everyone</button><span class="small muted" id="ann-status"></span></div>
+      <div id="ann-list"></div>
+    </div>
 
     <div class="section-label">Accounts</div>
     <div class="card">
@@ -2103,8 +2289,8 @@ function pageAdmin(view) {
     if (!a.paid_until) return `<span class="tag good">Paid</span>`;
     const until = new Date(a.paid_until);
     return until > new Date()
-      ? `<span class="tag good">Paid until ${until.toLocaleDateString()}</span>`
-      : `<span class="tag bad">Expired ${until.toLocaleDateString()}</span>`;
+      ? `<span class="tag good">Paid until ${fmtDate(until)}</span>`
+      : `<span class="tag bad">Expired ${fmtDate(until)}</span>`;
   }
 
   function drawStats() {
@@ -2177,7 +2363,7 @@ function pageAdmin(view) {
         // Extend from the later of today or the current expiry.
         const from = a.paid_until && new Date(a.paid_until) > new Date() ? a.paid_until : new Date();
         const until = sixMonthsFrom(from);
-        if (confirm(`Renew ${name} until ${new Date(until).toLocaleDateString()}?`)) update = { has_paid: true, paid_until: until, deleted: false };
+        if (confirm(`Renew ${name} until ${fmtDate(until)}?`)) update = { has_paid: true, paid_until: until, deleted: false };
         break;
       }
       case "toggle-admin":
@@ -2221,6 +2407,40 @@ function pageAdmin(view) {
     drawAccounts();
   })();
 
+  // ----- Announcements -----
+  async function loadAnnouncements() {
+    const box = $("#ann-list", view);
+    const { data, error } = await sb.from("announcements").select("id, message, created_at, active").order("created_at", { ascending: false }).limit(10);
+    if (error) {
+      box.innerHTML = `<p class="small banner info" style="margin:0;">To turn on announcements, run <code>supabase/announcements.sql</code> once in Supabase (SQL Editor → New query → paste → Run).</p>`;
+      $("#ann-send", view).disabled = true;
+      return;
+    }
+    box.innerHTML = (data || []).map((a) => `
+      <div class="list-row" style="${a.active ? "" : "opacity:.55;"}">
+        <div class="grow"><strong>${esc(a.message)}</strong><div class="muted small">${fmtDateTime(a.created_at)}</div></div>
+        ${a.active ? `<span class="tag good">Showing</span><button class="btn ghost sm" data-ann-off="${a.id}">Remove</button>` : `<span class="tag">Removed</span>`}
+      </div>`).join("") || `<p class="muted small" style="margin:0;">No announcements yet.</p>`;
+    $$("[data-ann-off]", box).forEach((b) => b.addEventListener("click", async () => {
+      const { error: e2 } = await sb.from("announcements").update({ active: false }).eq("id", b.dataset.annOff);
+      if (e2) return toast("Couldn't remove it.");
+      loadAnnouncements();
+    }));
+  }
+  $("#ann-send", view).addEventListener("click", async () => {
+    const message = $("#ann-text", view).value.trim();
+    if (!message) return toast("Type a message first.");
+    if (!confirm(`Send this to everyone?\n\n"${message}"`)) return;
+    // only one announcement shows at a time: retire the old ones
+    await sb.from("announcements").update({ active: false }).eq("active", true);
+    const { error } = await sb.from("announcements").insert({ message, created_by: authUser.id });
+    if (error) return toast("Couldn't send — check announcements.sql has been run.");
+    $("#ann-text", view).value = "";
+    toast("Announcement sent");
+    loadAnnouncements();
+  });
+  loadAnnouncements();
+
   // ----- Feedback -----
   async function loadFeedback() {
     const box = $("#fb-list", view);
@@ -2231,7 +2451,7 @@ function pageAdmin(view) {
       <div class="list-row" style="align-items:flex-start; ${f.completed ? "opacity:.6;" : ""}">
         <input type="checkbox" data-done="${f.id}" ${f.completed ? "checked" : ""} title="Mark done" style="margin-top:4px;">
         <div class="grow">
-          <div><span class="tag">${esc(f.category)}</span> <strong>${esc(f.username)}</strong> <span class="muted small">${new Date(f.created_at).toLocaleString()}</span></div>
+          <div><span class="tag">${esc(f.category)}</span> <strong>${esc(f.username)}</strong> <span class="muted small">${fmtDateTime(f.created_at)}</span></div>
           <div style="white-space:pre-wrap; margin-top:4px;">${esc(f.message)}</div>
           ${f.admin_reply ? `<div class="explain"><strong>Your reply:</strong> ${esc(f.admin_reply)}</div>` : ""}
           <div class="row" style="flex-wrap:nowrap; margin-top:8px;">

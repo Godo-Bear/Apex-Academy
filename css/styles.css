@@ -352,3 +352,13 @@ details[open] summary { margin-bottom: 4px; }
 @media (max-width: 400px) { .mobile-top .wm-rest { display: none; } }
 
 .terms-refund { background: var(--bad-soft); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
+
+/* Large text setting */
+html[data-text="large"] body { zoom: 1.12; }
+html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
+
+/* Announcements */
+.announce-big { font-family: var(--font-display); font-size: clamp(22px, 4vw, 32px); font-weight: 800; line-height: 1.25; white-space: pre-wrap; overflow-wrap: anywhere; }
+.announce-banner { background: linear-gradient(120deg, var(--warm), #E3963E); color: #1B1205; border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px; }
+.announce-banner .muted { color: rgba(27, 18, 5, .7); }
+.announce-banner .announce-big { font-size: clamp(18px, 3vw, 24px); }

@@ -8,24 +8,25 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261004f">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261004h">
 <!-- Home-screen icon: iPhone/iPad use apple-touch-icon, Android uses the manifest -->
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261004f">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261004h">
 <meta name="apple-mobile-web-app-title" content="Apex Academy">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/styles.css?v=20261004f">
+<link rel="stylesheet" href="css/styles.css?v=20261004h">
 <script>
   // Apply the saved theme before first paint to avoid a flash.
   try { const t = localStorage.getItem("apex-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  try { if ((JSON.parse(localStorage.getItem("apex-prefs")) || {}).textSize === "large") document.documentElement.dataset.text = "large"; } catch (e) {}
 </script>
 </head>
 <body>
 
 <template id="logo-tpl">
-  <img class="logo-mark" src="assets/logo.svg?v=20261004f" alt="">
+  <img class="logo-mark" src="assets/logo.svg?v=20261004h" alt="">
 </template>
 <template id="crest-tpl">
-  <img class="logo-crest" src="assets/crest.svg?v=20261004f" alt="">
+  <img class="logo-crest" src="assets/crest.svg?v=20261004h" alt="">
 </template>
 
 <!-- Loading -->
@@ -104,7 +105,7 @@
     <div class="sidebar-foot">
       <button class="nav-link" data-open="terms"><span class="ico">📄</span><span>Terms and Conditions</span></button>
       <div class="me-box"><strong id="me-name"></strong><span class="muted" id="me-rank" style="display:block;"></span><span class="muted" id="me-stats"></span></div>
-      <button class="nav-link" id="theme-toggle"><span class="ico">◐</span><span>Theme</span></button>
+      <a class="nav-link" href="#/settings" data-route="settings"><span class="ico">⚙️</span><span>Settings</span></a>
       <button class="nav-link" data-open="feedback"><span class="ico">💬</span><span>Feedback</span></button>
       <button class="nav-link" id="logout"><span class="ico">⏻</span><span>Log out</span></button>
     </div>
@@ -146,9 +147,19 @@
   <div class="card stack">
     <div class="row between"><h2 style="margin:0;">Menu</h2><button class="btn ghost" data-close>✕</button></div>
     <a class="btn secondary block hidden" id="menu-admin" href="#/admin">Admin</a>
+    <a class="btn secondary block" href="#/settings" id="menu-settings">⚙️ Settings</a>
     <button class="btn secondary block" data-open="feedback">Send feedback</button>
     <button class="btn secondary block" data-open="terms">📄 Terms and Conditions</button>
     <button class="btn secondary block" id="logout-m">Log out</button>
+  </div>
+</div>
+
+<!-- Announcement from the admin -->
+<div id="modal-announce" class="modal hidden" data-sticky="1">
+  <div class="card stack" style="text-align:center; max-width:560px;">
+    <div class="muted small" id="announce-date"></div>
+    <div class="announce-big" id="announce-text"></div>
+    <button class="btn block" id="announce-ok">Got it</button>
   </div>
 </div>
 
@@ -200,8 +211,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/data.js?v=20261004f"></script>
-<script src="js/lessons.js?v=20261004f"></script>
-<script src="js/app.js?v=20261004f"></script>
+<script src="js/data.js?v=20261004h"></script>
+<script src="js/lessons.js?v=20261004h"></script>
+<script src="js/app.js?v=20261004h"></script>
 </body>
 </html>

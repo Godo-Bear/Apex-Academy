@@ -34,3 +34,8 @@ It's a static site, so open `index.html` or serve the folder, for example `npx s
 
 Writing is saved in the browser automatically. To also save it to Supabase (so it follows a student to other devices),
 run `supabase/writings.sql` once in the Supabase SQL Editor.
+
+## Announcements
+
+Admins can send an announcement to everyone from the Admin page. Run `supabase/announcements.sql`
+once in the Supabase SQL Editor to turn this on.
