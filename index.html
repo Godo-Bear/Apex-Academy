@@ -8,12 +8,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261004a">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261004b">
 <!-- Home-screen icon: iPhone/iPad use apple-touch-icon, Android uses the manifest -->
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261004a">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261004b">
 <meta name="apple-mobile-web-app-title" content="Apex Academy">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/styles.css?v=20261004a">
+<link rel="stylesheet" href="css/styles.css?v=20261004b">
 <script>
   // Apply the saved theme before first paint to avoid a flash.
   try { const t = localStorage.getItem("apex-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
@@ -22,10 +22,10 @@
 <body>
 
 <template id="logo-tpl">
-  <img class="logo-mark" src="assets/logo.svg?v=20261004a" alt="">
+  <img class="logo-mark" src="assets/logo.svg?v=20261004b" alt="">
 </template>
 <template id="crest-tpl">
-  <img class="logo-crest" src="assets/crest.svg?v=20261004a" alt="">
+  <img class="logo-crest" src="assets/crest.svg?v=20261004b" alt="">
 </template>
 
 <!-- Loading -->
@@ -56,7 +56,7 @@
           <input type="password" id="auth-password" autocomplete="current-password" required minlength="6">
         </div>
         <label id="auth-terms-field" class="small muted hidden" style="display:flex; gap:8px; align-items:flex-start;">
-          <input type="checkbox" id="auth-terms"> <span>I agree to the <a href="#" data-open="terms">Terms &amp; Conditions</a></span>
+          <input type="checkbox" id="auth-terms"> <span>I agree to the <a href="#" data-open="terms">Terms &amp; Conditions</a> ($15 for 6 months, cash in hand, no refunds)</span>
         </label>
         <div id="auth-msg" class="hidden"></div>
         <button type="submit" id="auth-submit" class="btn block">Log in</button>
@@ -102,10 +102,18 @@
     <div class="logo" data-logo><span class="wordmark"><b>Apex</b> Academy</span></div>
     <nav id="nav"></nav>
     <div class="sidebar-foot">
+      <div class="terms-box">
+        <strong>📄 Your sign-up terms</strong>
+        <ul>
+          <li>$15 for 6 months</li>
+          <li>Cash in hand only</li>
+          <li><b>No refunds</b></li>
+        </ul>
+        <a href="#" data-open="terms">Read full terms →</a>
+      </div>
       <div class="me-box"><strong id="me-name"></strong><span class="muted" id="me-rank" style="display:block;"></span><span class="muted" id="me-stats"></span></div>
       <button class="nav-link" id="theme-toggle"><span class="ico">◐</span><span>Theme</span></button>
       <button class="nav-link" data-open="feedback"><span class="ico">💬</span><span>Feedback</span></button>
-      <button class="nav-link" data-open="terms"><span class="ico">📄</span><span>Terms</span></button>
       <button class="nav-link" id="logout"><span class="ico">⏻</span><span>Log out</span></button>
     </div>
   </aside>
@@ -147,7 +155,15 @@
     <div class="row between"><h2 style="margin:0;">Menu</h2><button class="btn ghost" data-close>✕</button></div>
     <a class="btn secondary block hidden" id="menu-admin" href="#/admin">Admin</a>
     <button class="btn secondary block" data-open="feedback">Send feedback</button>
-    <button class="btn secondary block" data-open="terms">Terms &amp; Conditions</button>
+    <div class="terms-box">
+      <strong>📄 Your sign-up terms</strong>
+      <ul>
+        <li>$15 for 6 months</li>
+        <li>Cash in hand only</li>
+        <li><b>No refunds</b></li>
+      </ul>
+      <a href="#" data-open="terms">Read full terms →</a>
+    </div>
     <button class="btn secondary block" id="logout-m">Log out</button>
   </div>
 </div>
@@ -160,7 +176,7 @@
       <p><strong>1. What this is.</strong> Apex Learning Academy is a paid maths and English practice site covering the Year 7 Victorian Curriculum. Access costs <strong>$15 AUD every 6 months</strong> per account.</p>
       <p><strong>2. Payment.</strong> Payment is <strong>cash in hand only</strong>, paid directly to the site owner. No card, bank transfer or online payments are accepted, and nothing is charged through this website. Your account is switched on once the owner has received your cash, and stays active for 6 months from that date.</p>
       <p><strong>3. Renewing.</strong> To keep using the site after 6 months, pay another $15 cash in hand. If you don't renew, your account is paused until you do; your progress is kept.</p>
-      <p><strong>4. Refunds.</strong> All payments are final. No refunds will be given once payment has been made.</p>
+      <p class="terms-refund"><strong>4. No refunds.</strong> All payments are final. <strong>No refunds will be given</strong> once payment has been made, including if you stop using the site before your 6 months are up.</p>
       <p><strong>5. Accounts.</strong> You are responsible for keeping your password private. Accounts may not be shared or resold. Apex Learning Academy reserves the right to suspend accounts found to be in breach of these terms.</p>
       <p><strong>6. Content.</strong> Practice questions are provided for study purposes and, while checked for accuracy, are not officially affiliated with or endorsed by any curriculum authority or textbook publisher.</p>
       <p><strong>7. Data.</strong> We store your email, username, and in-app progress (points, practice history) to operate the service. We do not sell your data to third parties.</p>
@@ -171,8 +187,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/data.js?v=20261004a"></script>
-<script src="js/lessons.js?v=20261004a"></script>
-<script src="js/app.js?v=20261004a"></script>
+<script src="js/data.js?v=20261004b"></script>
+<script src="js/lessons.js?v=20261004b"></script>
+<script src="js/app.js?v=20261004b"></script>
 </body>
 </html>
