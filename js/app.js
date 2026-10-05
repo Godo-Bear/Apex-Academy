@@ -912,7 +912,9 @@ function questionHTML(q, i, topicLabel = "") {
     <div class="question" data-qid="${q.id}">
       ${topicLabel ? `<div class="tag" style="display:inline-block; margin-bottom:6px;">${esc(topicLabel)}</div>` : ""}
       <div class="prompt"><span class="num">${i + 1}.</span>${esc(q.prompt)}</div>
-      <input type="text" data-qid="${q.id}" placeholder="Your answer" inputmode="${q.answerType === "text" ? "text" : "decimal"}">
+      ${q.options ? `<input type="hidden" data-qid="${q.id}" value="">
+      <div class="mc">${q.options.map((o) => `<label class="mc-opt"><input type="radio" name="mc-${q.id}" value="${esc(o)}"> <span>${esc(o)}</span></label>`).join("")}</div>`
+      : `<input type="text" data-qid="${q.id}" placeholder="Your answer" inputmode="${q.answerType === "text" ? "text" : "decimal"}">`}
       <div class="q-feedback"></div>
     </div>`;
 }
@@ -921,6 +923,15 @@ function questionHTML(q, i, topicLabel = "") {
 function markQuestion(row, q, correct, { yourAnswer } = {}) {
   const input = $("input", row);
   if (input) { input.disabled = true; input.classList.add(correct ? "correct" : "wrong"); }
+  if (q.options) {
+    $$(".mc-opt", row).forEach((label) => {
+      const radio = $("input", label);
+      radio.disabled = true;
+      if (yourAnswer !== undefined) radio.checked = radio.value === yourAnswer;
+      if (radio.value === String(displayAnswer(q))) label.classList.add("right");
+      else if (radio.checked) label.classList.add("wrong");
+    });
+  }
   const fb = $(".q-feedback", row);
   const yours = yourAnswer !== undefined ? `You answered: ${esc(yourAnswer || "(blank)")}. ` : "";
   fb.innerHTML = `
@@ -1710,8 +1721,13 @@ function pageTest(view) {
   const englishQuiz = ENGLISH_TOPICS.filter((t) => !t.special);
 
   view.innerHTML = `
-    <div class="page-head"><h1>Test</h1><p>Build a test from any topics. Questions are marked when you submit.</p></div>
-    <div class="card stack" id="builder">
+    <div class="page-head"><h1>Test</h1><p>Build a test from any topics, or chat with the AI to plan one. Questions are marked when you submit.</p></div>
+    <div class="segmented" id="t-mode" style="margin-bottom:14px;">
+      <button type="button" data-mode="pick" class="${testMode === "pick" ? "active" : ""}">🧩 Pick topics</button>
+      <button type="button" data-mode="chat" class="${testMode === "chat" ? "active" : ""}">💬 Chat with AI</button>
+    </div>
+    <div class="card stack ${testMode === "chat" ? "" : "hidden"}" id="chat-builder"></div>
+    <div class="card stack ${testMode === "pick" ? "" : "hidden"}" id="builder">
       <div id="t-bank">
       <div>
         <div class="row between"><label class="field">Maths topics</label><button class="btn ghost sm" data-all="maths">Select all</button></div>
@@ -1748,6 +1764,14 @@ function pageTest(view) {
       <div id="t-error" class="error hidden"></div>
       <button class="btn block" id="t-start">Start test →</button>
     </div>`;
+
+  $$("#t-mode button", view).forEach((b) => b.addEventListener("click", () => {
+    testMode = b.dataset.mode;
+    $$("#t-mode button", view).forEach((x) => x.classList.toggle("active", x === b));
+    $("#builder", view).classList.toggle("hidden", testMode !== "pick");
+    $("#chat-builder", view).classList.toggle("hidden", testMode !== "chat");
+  }));
+  testChatBuilder(view, $("#chat-builder", view));
 
   $$("[data-all]", view).forEach((btn) => btn.addEventListener("click", () => {
     const boxes = $$(`[data-group="${btn.dataset.all}"] input`, view);
@@ -1835,7 +1859,13 @@ Then write exactly ${count} new original questions on that same subject, at that
 
 ${rules}`;
 
-  const raw = (await askTutor(prompt)).replace(/```json/gi, "").replace(/```/g, "");
+  return parseAIQuestions(await askTutor(prompt), count);
+}
+
+// Turns the AI's JSON reply into test questions. Multiple-choice / true-false
+// questions keep their options; the answer must be one of them.
+function parseAIQuestions(reply, count) {
+  const raw = reply.replace(/```json/gi, "").replace(/```/g, "");
   const start = raw.indexOf("[");
   const end = raw.lastIndexOf("]");
   if (start === -1 || end < start) throw new Error("Unexpected AI response");
@@ -1844,18 +1874,166 @@ ${rules}`;
     .filter((q) => q && q.prompt && q.answer !== undefined && q.answer !== null && String(q.answer).trim() !== "")
     .slice(0, count)
     .map((q, i) => {
-      const answer = String(q.answer).trim();
-      const numeric = /^-?\d+(\.\d+)?$/.test(answer);
+      let answer = String(q.answer).trim();
+      let options = Array.isArray(q.options) ? [...new Set(q.options.map((o) => String(o).trim()).filter(Boolean))] : null;
+      if (options) {
+        const match = options.find((o) => o.toLowerCase() === answer.toLowerCase());
+        if (options.length >= 2 && match) {
+          answer = match;
+          if (options.length > 2) options = shuffle(options);
+        } else options = null;
+      }
+      const numeric = !options && /^-?\d+(\.\d+)?$/.test(answer);
       return {
         id: `ai-${stamp}-${i}`,
         prompt: String(q.prompt).trim(),
         answer: numeric ? parseFloat(answer) : answer,
         answerType: numeric ? undefined : "text",
+        ...(options ? { options } : {}),
         explanation: q.explanation || "",
         difficulty: [1, 2, 3].includes(Number(q.difficulty)) ? Number(q.difficulty) : 2,
         topicName: String(q.topicName || "AI question"),
       };
     });
+}
+
+// ---------------- Test: chat with the AI ----------------
+let testMode = "pick";
+const testChatLog = []; // kept for the session so switching pages doesn't wipe the chat
+
+const QUESTION_TYPES = {
+  short: "Short answer",
+  mc: "Multiple choice",
+  tf: "True or false",
+  blank: "Fill in the blank",
+  worded: "Worded problems",
+};
+
+function testChatBuilder(view, host) {
+  host.innerHTML = `
+    <p class="muted small" style="margin:0;">Tell the AI what you want to be tested on: topics, types of questions, how hard. It'll help you plan, then press <b>Make my test</b>.</p>
+    <div class="chat" id="tc-chat" style="min-height:160px;"></div>
+    <form class="chat-form" id="tc-form" autocomplete="off">
+      <input type="text" id="tc-input" placeholder="e.g. Fractions and percentages, multiple choice, medium">
+      <button class="btn" type="submit" id="tc-send">Send</button>
+    </form>
+    <div>
+      <label class="field">Question types <span class="muted">(optional, or just tell the AI)</span></label>
+      <div class="checklist" id="tc-types">
+        ${Object.entries(QUESTION_TYPES).map(([k, v]) => `<label class="chip-check"><input type="checkbox" value="${k}"> ${v}</label>`).join("")}
+      </div>
+    </div>
+    <div class="grid" style="grid-template-columns: 1fr 1fr;">
+      <div><label class="field" for="tc-count">Questions</label><input type="number" id="tc-count" min="1" max="30" value="10"></div>
+      <div><label class="field" for="tc-time">Time limit</label>
+        <select id="tc-time">
+          <option value="0">No limit</option>
+          ${[5, 10, 15, 20, 30, 45, 60].map((m) => `<option value="${m}" ${m === 20 ? "selected" : ""}>${m} minutes</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div id="tc-error" class="error hidden"></div>
+    <div class="row between">
+      <button class="btn ghost sm" type="button" id="tc-clear">Start over</button>
+      <button class="btn" type="button" id="tc-make">Make my test →</button>
+    </div>`;
+
+  const log = $("#tc-chat", host);
+  const input = $("#tc-input", host);
+  const sendBtn = $("#tc-send", host);
+  const err = $("#tc-error", host);
+  const types = () => $$("#tc-types input:checked", host).map((b) => QUESTION_TYPES[b.value]);
+  const history = () => testChatLog.filter((m) => m.role !== "err").slice(-12)
+    .map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.text}`).join("\n");
+
+  const draw = () => {
+    $("#tc-clear", host).classList.toggle("hidden", !testChatLog.length);
+    if (!testChatLog.length) {
+      const ideas = ["Test me on fractions and decimals, multiple choice", "I want hard algebra worded problems", "Grammar and punctuation, true or false and fill in the blanks", "I'm not sure, what should I practise?"];
+      log.innerHTML = `<div class="chat-empty small">What do you want your test to be about?
+        <div class="chips">${ideas.map((x) => `<button type="button" class="btn secondary sm">${esc(x)}</button>`).join("")}</div></div>`;
+      $$(".chips button", log).forEach((b) => b.addEventListener("click", () => send(b.textContent)));
+      return;
+    }
+    log.innerHTML = testChatLog.map((m) => `<div class="bubble ${m.role}">${esc(m.text)}</div>`).join("");
+    log.scrollTop = log.scrollHeight;
+  };
+
+  async function send(text) {
+    text = text.trim();
+    if (!text) return;
+    hide(err);
+    const before = history();
+    testChatLog.push({ role: "me", text });
+    const pending = { role: "bot", text: "Thinking…" };
+    testChatLog.push(pending);
+    input.value = "";
+    sendBtn.disabled = true;
+    draw();
+    const picked = types();
+    const topicList = [...MATHS_TOPICS, ...ENGLISH_TOPICS.filter((t) => !t.special)].map((t) => t.name).join(", ");
+    try {
+      pending.text = await askTutor(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student plan a practice test. Find out what they want: which topics, what types of questions (short answer, multiple choice, true or false, fill in the blank, worded problems) and how hard (easy, medium or hard). If they're unsure, suggest something sensible. Ask at most one or two short questions at a time. Once you know enough, sum up the test plan in a few short lines and tell them to press "Make my test" when they're ready. The number of questions (${$("#tc-count", host).value}) and the time limit are set with the boxes under the chat, so don't ask about those. You only plan the test: do NOT write the test questions in the chat. Keep replies under 90 words, warm and clear, with no markdown formatting.
+
+Topics on the site: ${topicList}. The student can ask for other maths or English topics too.
+${picked.length ? `They've ticked these question types: ${picked.join(", ")}.\n` : ""}
+${before ? `Conversation so far:\n${before}\n` : ""}Student: ${text}
+Tutor:`);
+    } catch (e) {
+      console.error(e);
+      pending.role = "err";
+      pending.text = "Sorry, I couldn't reach the AI. Please try again in a moment.";
+    }
+    if (!document.body.contains(log)) return;
+    draw();
+    sendBtn.disabled = false;
+    input.focus();
+  }
+
+  $("#tc-form", host).addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
+  $("#tc-clear", host).addEventListener("click", () => {
+    testChatLog.length = 0;
+    hide(err);
+    draw();
+  });
+
+  $("#tc-make", host).addEventListener("click", async () => {
+    hide(err);
+    const typed = input.value.trim();
+    if (!testChatLog.some((m) => m.role === "me") && !typed) return setMsg(err, "Tell the AI what you want your test to be about first.", "error");
+    const count = Math.max(1, Math.min(30, parseInt($("#tc-count", host).value, 10) || 10));
+    const minutes = +$("#tc-time", host).value;
+    const btn = $("#tc-make", host);
+    btn.disabled = true;
+    btn.textContent = "Writing your test…";
+    const picked = types();
+    try {
+      const qs = parseAIQuestions(await askTutor(`You are writing a practice test for a Year 7 student (Victorian Curriculum, Australia). Here is the student's chat with a tutor about what they want on the test:
+"""
+${history()}${typed ? `\nStudent: ${typed}` : ""}
+"""
+${picked.length ? `Use ONLY these question types: ${picked.join(", ")}.\n` : "Use the question types the student asked for. If they didn't say, mix short answer and multiple choice.\n"}
+Write exactly ${count} new original questions covering the topics, question types and difficulty the student asked for. Pitch them at a Year 7 level unless the student asked for easier or harder.
+
+Question type rules:
+- Short answer, fill in the blank and worded problems: ONE short, clearly correct answer (a number, word or short phrase), since answers are checked by exact text match. For fill in the blank, show the gap as "____" in the question.
+- Multiple choice: give 4 options in "options", and "answer" must be exactly one of them.
+- True or false: "options" must be ["True", "False"] and "answer" one of them.
+
+Respond with ONLY a valid JSON array, no other text, no markdown code fences, in exactly this format:
+[{"prompt": "question text", "options": ["only for multiple choice or true/false"], "answer": "the answer", "explanation": "a one-sentence explanation of the answer", "difficulty": 1, "topicName": "the topic"}]
+Leave out "options" for questions that aren't multiple choice or true/false. difficulty is 1 for easy, 2 for medium, 3 for hard.`), count);
+      if (!qs.length) throw new Error("No usable questions");
+      runTest(view, qs.map((q) => ({ q, topic: { id: null, name: q.topicName, icon: "🤖" } })), minutes);
+    } catch (e) {
+      console.error("Apex: AI chat test failed —", e);
+      btn.disabled = false;
+      btn.textContent = "Make my test →";
+      setMsg(err, "Couldn't write the test. Try telling the AI a bit more, then press Make my test again.", "error");
+    }
+  });
+
+  draw();
 }
 
 function runTest(view, items, minutes) {
@@ -1878,10 +2056,15 @@ function runTest(view, items, minutes) {
 
   const form = $("#t-form", view);
   const drawAnswered = () => {
-    const n = $$("input", form).filter((i) => i.value.trim()).length;
+    const n = $$("input[data-qid]", form).filter((i) => i.value.trim()).length;
     $("#answered", view).textContent = `${n} of ${items.length} answered`;
   };
   drawAnswered();
+  form.addEventListener("change", (e) => {
+    if (e.target.type !== "radio") return;
+    $(`input[data-qid]`, e.target.closest(".question")).value = e.target.value;
+    drawAnswered();
+  });
   form.addEventListener("input", drawAnswered);
 
   const clock = $("#t-clock", view);
@@ -1898,14 +2081,14 @@ function runTest(view, items, minutes) {
     }, 1000);
   }
   cleanup = () => clearInterval(timer);
-  $("input", form)?.focus();
+  $("input:not([type=hidden])", form)?.focus();
   $("#t-quit", view).addEventListener("click", () => {
     if (confirm(leaveWarning)) route(); // route() clears the timer and warning
   });
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const blanks = $$("input", form).filter((i) => !i.value.trim()).length;
+    const blanks = $$("input[data-qid]", form).filter((i) => !i.value.trim()).length;
     if (blanks && !confirm(`You've left ${blanks} blank. Submit anyway?`)) return;
     finish();
   });
