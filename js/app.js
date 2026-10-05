@@ -206,6 +206,7 @@ function bumpStreak() {
 function recordResults(results, { isTest = false } = {}) {
   // results: [{ q, topic, correct }]
   let earned = 0;
+  const boost = eventBoost(isTest);
   results.forEach(({ q, topic, correct }) => {
     // AI-generated test questions have no topic id, so they earn points but don't count toward mastery.
     if (topic.id) {
@@ -215,8 +216,10 @@ function recordResults(results, { isTest = false } = {}) {
     }
     if (correct) earned += pointsFor(q, topic);
   });
+  const xp = earned * boost.xp;
+  earned *= boost.points;
   me.points += earned;
-  me.xp += earned;
+  me.xp += xp;
   if (isTest) me.testPoints += earned;
   bumpStreak();
   saveProgress();
@@ -477,6 +480,7 @@ function enterApp() {
   showScreen("app");
   route();
   showLoginNotices();
+  loadEvents();
 }
 
 // ---------------- Login notices ----------------
@@ -560,6 +564,65 @@ function showAnnouncementPop(a) {
 
 // Pick up new announcements for people who keep the site open.
 setInterval(() => { if (me) checkAnnouncement(); }, 5 * 60 * 1000);
+
+// ---------------- Events ----------------
+// Admins run boost events (double points, triple XP, ...). Needs supabase/events.sql.
+const EVENT_KINDS = {
+  both: { label: "Points & XP", note: "everywhere" },
+  points: { label: "Points", note: "everywhere" },
+  xp: { label: "XP", note: "everywhere" },
+  tests: { label: "Points & XP", note: "in tests" },
+  practice: { label: "Points & XP", note: "in practice" },
+};
+const multName = (m) => ({ 2: "Double", 3: "Triple", 4: "Quadruple" }[m] || `${m}×`);
+const eventName = (e) => e.title || `${multName(e.multiplier)} ${EVENT_KINDS[e.kind]?.label || "Points"}`;
+let events = [];
+
+async function loadEvents() {
+  const { data, error } = await sb.from("events").select("*").gt("ends_at", new Date().toISOString()).order("starts_at");
+  events = error ? [] : data || [];
+  drawEventBar();
+}
+const liveEvents = () => { const now = Date.now(); return events.filter((e) => new Date(e.starts_at) <= now && new Date(e.ends_at) > now); };
+
+// The best multiplier from any live event, for points and XP separately.
+function eventBoost(isTest) {
+  const boost = { points: 1, xp: 1 };
+  liveEvents().forEach((e) => {
+    if ((e.kind === "tests" && !isTest) || (e.kind === "practice" && isTest)) return;
+    if (e.kind !== "xp") boost.points = Math.max(boost.points, e.multiplier);
+    if (e.kind !== "points") boost.xp = Math.max(boost.xp, e.multiplier);
+  });
+  return boost;
+}
+// "(2× event!)" after points earned, when a boost applied.
+function boostNote(isTest) {
+  const b = eventBoost(isTest);
+  const m = Math.max(b.points, b.xp);
+  return m > 1 ? ` <span class="tag event-tag">⚡ ${m}× event</span>` : "";
+}
+
+function timeLeft(ms) {
+  const mins = Math.max(1, Math.round(ms / 60000));
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60), d = Math.floor(h / 24);
+  if (d >= 1) return `${d} day${d > 1 ? "s" : ""}${h % 24 ? ` ${h % 24} h` : ""}`;
+  return `${h} h${mins % 60 ? ` ${mins % 60} min` : ""}`;
+}
+
+function drawEventBar() {
+  const bar = $("#event-bar");
+  if (!bar) return;
+  const live = liveEvents();
+  if (!live.length) { hide(bar); bar.innerHTML = ""; return; }
+  bar.innerHTML = live.map((e) => `
+    <div class="event-row"><span class="event-bolt">⚡</span>
+      <span class="grow"><b>${esc(eventName(e))}</b> is on ${EVENT_KINDS[e.kind]?.note || ""}!</span>
+      <span class="event-time">Ends in ${timeLeft(new Date(e.ends_at) - Date.now())}</span></div>`).join("");
+  show(bar);
+}
+setInterval(() => { if (me) drawEventBar(); }, 30 * 1000);
+setInterval(() => { if (me) loadEvents(); }, 2 * 60 * 1000);
 
 function showTermsChanged(next) {
   $("#terms-changes").innerHTML = TERMS_CHANGES.map((c) => `<li>${esc(c)}</li>`).join("");
@@ -825,7 +888,8 @@ function pageTopic(view, t) {
   function newSet() {
     $$("#diff button", view).forEach((b) => b.classList.toggle("active", +b.dataset.d === difficulty));
     set = nextPracticeSet(t, difficulty);
-    $("#pts-each", view).textContent = set.length ? `+${pointsFor(set[0], t)} pts each` : "";
+    const boosted = eventBoost(false).points;
+    $("#pts-each", view).textContent = set.length ? `+${pointsFor(set[0], t) * boosted} pts each${boosted > 1 ? ` (⚡ ${boosted}× event)` : ""}` : "";
 
     const form = $("#qset", view);
     if (!set.length) { form.innerHTML = `<p class="muted">No questions at this level yet — try another.</p>`; return; }
@@ -861,7 +925,7 @@ function pageTopic(view, t) {
     const kind = right === set.length ? "good" : right === 0 ? "bad" : "info";
     const actions = $(".row:last-child", form);
     actions.innerHTML = `
-      <div class="banner ${kind}" style="flex:1;">${right}/${set.length} correct · +${earned} points</div>
+      <div class="banner ${kind}" style="flex:1;">${right}/${set.length} correct · +${earned} points${earned ? boostNote(false) : ""}</div>
       <button class="btn" type="button" id="next-set">Next set →</button>`;
     $("#next-set", form).addEventListener("click", () => { delete form.dataset.checked; newSet(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   });
@@ -911,8 +975,10 @@ function questionHTML(q, i, topicLabel = "") {
   return `
     <div class="question" data-qid="${q.id}">
       ${topicLabel ? `<div class="tag" style="display:inline-block; margin-bottom:6px;">${esc(topicLabel)}</div>` : ""}
+      ${q.showPassage ? `<div class="passage">${esc(q.passage)}</div>` : ""}
       <div class="prompt"><span class="num">${i + 1}.</span>${esc(q.prompt)}</div>
-      ${q.options ? `<input type="hidden" data-qid="${q.id}" value="">
+      ${q.answerType === "written" ? `<textarea data-qid="${q.id}" rows="3" placeholder="Write your answer in your own words"></textarea>`
+      : q.options ? `<input type="hidden" data-qid="${q.id}" value="">
       <div class="mc">${q.options.map((o) => `<label class="mc-opt"><input type="radio" name="mc-${q.id}" value="${esc(o)}"> <span>${esc(o)}</span></label>`).join("")}</div>`
       : `<input type="text" data-qid="${q.id}" placeholder="Your answer" inputmode="${q.answerType === "text" ? "text" : "decimal"}">`}
       <div class="q-feedback"></div>
@@ -920,8 +986,8 @@ function questionHTML(q, i, topicLabel = "") {
 }
 
 // Shows right/wrong, plus explanation and AI step-by-step buttons.
-function markQuestion(row, q, correct, { yourAnswer } = {}) {
-  const input = $("input", row);
+function markQuestion(row, q, correct, { yourAnswer, feedback } = {}) {
+  const input = $("input, textarea", row);
   if (input) { input.disabled = true; input.classList.add(correct ? "correct" : "wrong"); }
   if (q.options) {
     $$(".mc-opt", row).forEach((label) => {
@@ -935,7 +1001,11 @@ function markQuestion(row, q, correct, { yourAnswer } = {}) {
   const fb = $(".q-feedback", row);
   const yours = yourAnswer !== undefined ? `You answered: ${esc(yourAnswer || "(blank)")}. ` : "";
   fb.innerHTML = `
-    <div class="q-result ${correct ? "correct" : "wrong"}">${correct ? "✓ Correct" : `✕ ${yours}The answer is ${esc(displayAnswer(q))}`}</div>
+    ${q.answerType === "written"
+      ? `<div class="q-result ${correct ? "correct" : "wrong"}">${correct ? "✓ Good answer" : "✕ Not quite"}</div>
+         ${feedback ? `<div class="explain">${esc(feedback)}</div>` : ""}
+         <div class="explain"><b>Example answer:</b> ${esc(displayAnswer(q))}</div>`
+      : `<div class="q-result ${correct ? "correct" : "wrong"}">${correct ? "✓ Correct" : `✕ ${yours}The answer is ${esc(displayAnswer(q))}`}</div>`}
     <div class="q-tools">
       ${q.explanation ? `<button type="button" class="btn ghost sm" data-act="explain">Explanation</button>` : ""}
       <button type="button" class="btn ghost sm" data-act="steps">Step-by-step (AI)</button>
@@ -1870,6 +1940,7 @@ function parseAIQuestions(reply, count) {
   const end = raw.lastIndexOf("]");
   if (start === -1 || end < start) throw new Error("Unexpected AI response");
   const stamp = Date.now();
+  let lastPassage = "";
   return JSON.parse(raw.slice(start, end + 1))
     .filter((q) => q && q.prompt && q.answer !== undefined && q.answer !== null && String(q.answer).trim() !== "")
     .slice(0, count)
@@ -1883,13 +1954,18 @@ function parseAIQuestions(reply, count) {
           if (options.length > 2) options = shuffle(options);
         } else options = null;
       }
-      const numeric = !options && /^-?\d+(\.\d+)?$/.test(answer);
+      const written = !options && String(q.type || "").toLowerCase() === "written";
+      const numeric = !options && !written && /^-?\d+(\.\d+)?$/.test(answer);
+      const passage = q.passage ? String(q.passage).trim() : "";
+      const showPassage = !!passage && passage !== lastPassage;
+      lastPassage = passage;
       return {
         id: `ai-${stamp}-${i}`,
         prompt: String(q.prompt).trim(),
         answer: numeric ? parseFloat(answer) : answer,
-        answerType: numeric ? undefined : "text",
+        answerType: written ? "written" : numeric ? undefined : "text",
         ...(options ? { options } : {}),
+        ...(passage ? { passage, showPassage } : {}),
         explanation: q.explanation || "",
         difficulty: [1, 2, 3].includes(Number(q.difficulty)) ? Number(q.difficulty) : 2,
         topicName: String(q.topicName || "AI question"),
@@ -1907,11 +1983,15 @@ const QUESTION_TYPES = {
   tf: "True or false",
   blank: "Fill in the blank",
   worded: "Worded problems",
+  written: "Explain in your own words (AI-marked)",
+  passage: "Reading passage",
+  odd: "Odd one out",
+  mistake: "Spot the mistake",
 };
 
 function testChatBuilder(view, host) {
   host.innerHTML = `
-    <p class="muted small" style="margin:0;">Tell the AI what you want to be tested on: topics, types of questions, how hard. It'll help you plan, then press <b>Make my test</b>.</p>
+    <p class="muted small" style="margin:0;">Tell the AI what you want to be tested on (any subject, like maths, English, science or history), what types of questions, and how hard. You can even paste in a text to be quizzed on. It'll help you plan, then press <b>Make my test</b>.</p>
     <div class="chat" id="tc-chat" style="min-height:160px;"></div>
     <form class="chat-form" id="tc-form" autocomplete="off">
       <input type="text" id="tc-input" placeholder="e.g. Fractions and percentages, multiple choice, medium">
@@ -1949,7 +2029,7 @@ function testChatBuilder(view, host) {
   const draw = () => {
     $("#tc-clear", host).classList.toggle("hidden", !testChatLog.length);
     if (!testChatLog.length) {
-      const ideas = ["Test me on fractions and decimals, multiple choice", "I want hard algebra worded problems", "Grammar and punctuation, true or false and fill in the blanks", "I'm not sure, what should I practise?"];
+      const ideas = ["Test me on fractions and decimals, multiple choice", "Science quiz on the solar system", "Write a reading passage and ask me questions on it", "History: ancient Egypt, mix of question types", "Spot the mistake in grammar sentences", "I'm not sure, what should I practise?"];
       log.innerHTML = `<div class="chat-empty small">What do you want your test to be about?
         <div class="chips">${ideas.map((x) => `<button type="button" class="btn secondary sm">${esc(x)}</button>`).join("")}</div></div>`;
       $$(".chips button", log).forEach((b) => b.addEventListener("click", () => send(b.textContent)));
@@ -1973,9 +2053,9 @@ function testChatBuilder(view, host) {
     const picked = types();
     const topicList = [...MATHS_TOPICS, ...ENGLISH_TOPICS.filter((t) => !t.special)].map((t) => t.name).join(", ");
     try {
-      pending.text = await askTutor(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student plan a practice test. Find out what they want: which topics, what types of questions (short answer, multiple choice, true or false, fill in the blank, worded problems) and how hard (easy, medium or hard). If they're unsure, suggest something sensible. Ask at most one or two short questions at a time. Once you know enough, sum up the test plan in a few short lines and tell them to press "Make my test" when they're ready. The number of questions (${$("#tc-count", host).value}) and the time limit are set with the boxes under the chat, so don't ask about those. You only plan the test: do NOT write the test questions in the chat. Keep replies under 90 words, warm and clear, with no markdown formatting.
+      pending.text = await askTutor(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student plan a practice test. The test can be on ANY school subject or topic they like: maths, English, science, history, geography, health, languages, digital technologies, general knowledge, or something they're interested in (keep it school-appropriate). Find out what they want: which topics, what types of questions and how hard (easy, medium or hard). Question types you can offer: short answer, multiple choice, true or false, fill in the blank, worded problems, explain in your own words (the AI marks these), questions about a reading passage (you write one, or they paste their own text into the chat), odd one out, spot the mistake, and any other special style they ask for, as long as each question can be answered in a word, a short phrase, by picking an option, or in a few sentences. If they're unsure, suggest something sensible. Ask at most one or two short questions at a time. Once you know enough, sum up the test plan in a few short lines and tell them to press "Make my test" when they're ready. The number of questions (${$("#tc-count", host).value}) and the time limit are set with the boxes under the chat, so don't ask about those. You only plan the test: do NOT write the test questions in the chat. Keep replies under 90 words, warm and clear, with no markdown formatting.
 
-Topics on the site: ${topicList}. The student can ask for other maths or English topics too.
+Topics already on the site: ${topicList}. The student can ask for any other subject or topic too.
 ${picked.length ? `They've ticked these question types: ${picked.join(", ")}.\n` : ""}
 ${before ? `Conversation so far:\n${before}\n` : ""}Student: ${text}
 Tutor:`);
@@ -2013,16 +2093,19 @@ Tutor:`);
 ${history()}${typed ? `\nStudent: ${typed}` : ""}
 """
 ${picked.length ? `Use ONLY these question types: ${picked.join(", ")}.\n` : "Use the question types the student asked for. If they didn't say, mix short answer and multiple choice.\n"}
-Write exactly ${count} new original questions covering the topics, question types and difficulty the student asked for. Pitch them at a Year 7 level unless the student asked for easier or harder.
+Write exactly ${count} new original questions covering the subjects, topics, question types and difficulty the student asked for (any school subject is fine). Pitch them at a Year 7 level unless the student asked for easier or harder. Make sure every fact and answer is correct.
 
 Question type rules:
 - Short answer, fill in the blank and worded problems: ONE short, clearly correct answer (a number, word or short phrase), since answers are checked by exact text match. For fill in the blank, show the gap as "____" in the question.
-- Multiple choice: give 4 options in "options", and "answer" must be exactly one of them.
+- Multiple choice, odd one out and spot the mistake: give 4 options in "options", and "answer" must be exactly one of them.
 - True or false: "options" must be ["True", "False"] and "answer" one of them.
+- Explain in your own words: set "type" to "written". "answer" is a short example answer (1-3 sentences). The AI marks these later.
+- Reading passage: put the passage (80-200 words, or the student's own text if they pasted one) in "passage" on EVERY question about it, copied exactly the same each time.
+- Any other special style the student asked for: fit it into one of the formats above.
 
 Respond with ONLY a valid JSON array, no other text, no markdown code fences, in exactly this format:
-[{"prompt": "question text", "options": ["only for multiple choice or true/false"], "answer": "the answer", "explanation": "a one-sentence explanation of the answer", "difficulty": 1, "topicName": "the topic"}]
-Leave out "options" for questions that aren't multiple choice or true/false. difficulty is 1 for easy, 2 for medium, 3 for hard.`), count);
+[{"prompt": "question text", "options": ["only for multiple choice, odd one out, spot the mistake or true/false"], "type": "only \"written\" for explain-in-your-own-words", "passage": "only for reading passage questions", "answer": "the answer", "explanation": "a one-sentence explanation of the answer", "difficulty": 1, "topicName": "the subject and topic, e.g. Science: Cells"}]
+Leave out "options", "type" and "passage" when they don't apply. difficulty is 1 for easy, 2 for medium, 3 for hard.`), count);
       if (!qs.length) throw new Error("No usable questions");
       runTest(view, qs.map((q) => ({ q, topic: { id: null, name: q.topicName, icon: "🤖" } })), minutes);
     } catch (e) {
@@ -2034,6 +2117,38 @@ Leave out "options" for questions that aren't multiple choice or true/false. dif
   });
 
   draw();
+}
+
+const ANSWER_SEL = "input[data-qid], textarea[data-qid]";
+
+// Asks the AI to mark "explain in your own words" answers. Returns { [index]: { correct, feedback } }.
+async function markWrittenAnswers(list) {
+  const out = {};
+  const blank = list.filter((w) => !w.answer.trim());
+  blank.forEach((w) => { out[w.i] = { correct: false, feedback: "You left this one blank." }; });
+  const todo = list.filter((w) => w.answer.trim());
+  if (!todo.length) return out;
+  try {
+    const reply = await askTutor(`You are a fair, encouraging Year 7 teacher marking short written answers. For each one, decide if the student's answer is correct: it shows the key idea of the example answer, even if worded differently or with small spelling mistakes. Then give one or two short sentences of feedback written to the student.
+
+${todo.map((w, n) => `Answer ${n + 1}
+Question: ${w.q.prompt}${w.q.passage ? `\nPassage: ${w.q.passage}` : ""}
+Example answer: ${w.q.answer}
+Student's answer: ${w.answer}`).join("\n\n")}
+
+Respond with ONLY a valid JSON array with one item per answer, in order, no other text:
+[{"correct": true, "feedback": "..."}]`);
+    const raw = reply.replace(/```json/gi, "").replace(/```/g, "");
+    const marks = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+    todo.forEach((w, n) => {
+      const m = marks[n] || {};
+      out[w.i] = { correct: m.correct === true || m.correct === "true", feedback: String(m.feedback || "") };
+    });
+  } catch (e) {
+    console.error("Apex: AI marking failed —", e);
+    todo.forEach((w) => { out[w.i] = { correct: false, feedback: "Couldn't reach the AI to mark this one. Compare your answer with the example answer below." }; });
+  }
+  return out;
 }
 
 function runTest(view, items, minutes) {
@@ -2056,13 +2171,13 @@ function runTest(view, items, minutes) {
 
   const form = $("#t-form", view);
   const drawAnswered = () => {
-    const n = $$("input[data-qid]", form).filter((i) => i.value.trim()).length;
+    const n = $$(ANSWER_SEL, form).filter((i) => i.value.trim()).length;
     $("#answered", view).textContent = `${n} of ${items.length} answered`;
   };
   drawAnswered();
   form.addEventListener("change", (e) => {
     if (e.target.type !== "radio") return;
-    $(`input[data-qid]`, e.target.closest(".question")).value = e.target.value;
+    $("input[data-qid]", e.target.closest(".question")).value = e.target.value;
     drawAnswered();
   });
   form.addEventListener("input", drawAnswered);
@@ -2088,17 +2203,29 @@ function runTest(view, items, minutes) {
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const blanks = $$("input[data-qid]", form).filter((i) => !i.value.trim()).length;
+    const blanks = $$(ANSWER_SEL, form).filter((i) => !i.value.trim()).length;
     if (blanks && !confirm(`You've left ${blanks} blank. Submit anyway?`)) return;
     finish();
   });
 
-  function finish() {
+  let finished = false;
+  async function finish() {
+    if (finished) return;
+    finished = true;
     clearInterval(timer);
+    const answers = items.map(({ q }) => $(`input[data-qid="${q.id}"], textarea[data-qid="${q.id}"]`, form).value);
+    const feedback = {};
+    const written = items.map(({ q }, i) => ({ q, i, answer: answers[i] })).filter((w) => w.q.answerType === "written");
+    if (written.length) {
+      $$("button, input, textarea", form).forEach((el) => { el.disabled = true; });
+      $("#answered", view).textContent = "The AI is marking your written answers…";
+      Object.assign(feedback, await markWrittenAnswers(written));
+      if (!document.body.contains(form)) return;
+    }
     leaveWarning = null;
     flushPendingAnnouncement();
-    const answers = items.map(({ q }) => $(`input[data-qid="${q.id}"]`, form).value);
-    const results = items.map(({ q, topic }, i) => ({ q, topic, correct: isAnswerCorrect(q, answers[i]) }));
+    const results = items.map(({ q, topic }, i) => ({ q, topic,
+      correct: q.answerType === "written" ? !!feedback[i]?.correct : isAnswerCorrect(q, answers[i]) }));
     const right = results.filter((r) => r.correct).length;
     const earned = recordResults(results, { isTest: true });
     const pct = Math.round((right / items.length) * 100);
@@ -2108,7 +2235,7 @@ function runTest(view, items, minutes) {
       <div class="grid cols-3" style="margin-bottom:16px;">
         ${statCard("Score", `${right}/${items.length}`)}
         ${statCard("Percent", pct + "%")}
-        ${statCard("Points", "+" + earned)}
+        ${statCard("Points" + (earned ? boostNote(true) : ""), "+" + earned)}
       </div>
       <div class="card" id="review">
         ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name)).join("")}
@@ -2117,8 +2244,8 @@ function runTest(view, items, minutes) {
 
     items.forEach(({ q }, i) => {
       const row = $(`.question[data-qid="${q.id}"]`, view);
-      $("input", row).value = answers[i];
-      markQuestion(row, q, results[i].correct, { yourAnswer: answers[i] });
+      $("input, textarea", row).value = answers[i];
+      markQuestion(row, q, results[i].correct, { yourAnswer: answers[i], feedback: feedback[i]?.feedback });
     });
     // Already on #/test, so re-render the builder directly.
     $("#again", view).addEventListener("click", (e) => { e.preventDefault(); route(); });
@@ -2463,6 +2590,36 @@ function pageAdmin(view) {
       <div id="ann-list"></div>
     </div>
 
+    <div class="section-label">⚡ Events</div>
+    <div class="card stack">
+      <p class="muted small" style="margin:0;">Run a boost event like Double Points or Triple XP. Everyone sees a banner at the top while it's on, and earns extra for correct answers.</p>
+      <div class="grid" style="grid-template-columns: 1fr 1fr;">
+        <div><label class="field" for="ev-mult">Boost</label>
+          <select id="ev-mult">${[2, 3, 4, 5].map((m) => `<option value="${m}">${multName(m)} (${m}×)</option>`).join("")}</select></div>
+        <div><label class="field" for="ev-kind">On</label>
+          <select id="ev-kind">
+            <option value="both">Points and XP</option>
+            <option value="points">Points only</option>
+            <option value="xp">XP only</option>
+            <option value="tests">Tests only</option>
+            <option value="practice">Practice only</option>
+          </select></div>
+        <div><label class="field" for="ev-start">Starts</label>
+          <select id="ev-start"><option value="now">Now</option><option value="later">Later…</option></select>
+          <input type="datetime-local" id="ev-start-at" class="hidden" style="margin-top:6px;"></div>
+        <div><label class="field" for="ev-len">Lasts</label>
+          <select id="ev-len">
+            ${[[30, "30 minutes"], [60, "1 hour"], [120, "2 hours"], [180, "3 hours"], ["day", "Until midnight"], [1440, "24 hours"], [2880, "2 days (weekend)"], [10080, "1 week"]]
+              .map(([v, l]) => `<option value="${v}" ${v === 60 ? "selected" : ""}>${l}</option>`).join("")}
+          </select></div>
+      </div>
+      <div><label class="field" for="ev-title">Name <span class="muted">(optional)</span></label>
+        <input type="text" id="ev-title" maxlength="60" placeholder="e.g. Friday Frenzy (leave blank for “Double Points & XP”)"></div>
+      <label class="small" style="display:flex; gap:8px; align-items:center;"><input type="checkbox" id="ev-announce" checked> Also send an announcement about it</label>
+      <div class="row"><button class="btn" id="ev-go">Start event</button></div>
+      <div id="ev-list"></div>
+    </div>
+
     <div class="section-label">Accounts</div>
     <div class="card">
       <input type="text" id="acct-search" placeholder="Search name or email" style="margin-bottom:10px;">
@@ -2647,6 +2804,69 @@ function pageAdmin(view) {
     loadAnnouncements();
   });
   loadAnnouncements();
+
+  // ----- Events -----
+  const evStart = $("#ev-start", view);
+  evStart.addEventListener("change", () => $("#ev-start-at", view).classList.toggle("hidden", evStart.value !== "later"));
+  async function loadAdminEvents() {
+    const box = $("#ev-list", view);
+    const { data, error } = await sb.from("events").select("*").order("starts_at", { ascending: false }).limit(10);
+    if (error) {
+      box.innerHTML = `<p class="small banner info" style="margin:0;">To turn on events, run <code>supabase/events.sql</code> once in Supabase (SQL Editor → New query → paste → Run).</p>`;
+      $("#ev-go", view).disabled = true;
+      return;
+    }
+    const now = Date.now();
+    box.innerHTML = (data || []).map((e) => {
+      const start = new Date(e.starts_at), end = new Date(e.ends_at);
+      const state = end <= now ? "ended" : start > now ? "soon" : "live";
+      return `<div class="list-row" style="${state === "ended" ? "opacity:.55;" : ""}">
+        <div class="grow"><strong>⚡ ${esc(eventName(e))}</strong> <span class="muted small">(${e.multiplier}× ${EVENT_KINDS[e.kind]?.label || ""} ${EVENT_KINDS[e.kind]?.note || ""})</span>
+          <div class="muted small">${fmtDateTime(e.starts_at)} → ${fmtDateTime(e.ends_at)}</div></div>
+        ${state === "live" ? `<span class="tag good">On now</span>` : state === "soon" ? `<span class="tag">Starts later</span>` : `<span class="tag">Ended</span>`}
+        ${state !== "ended" ? `<button class="btn ghost sm" data-ev-end="${e.id}">${state === "live" ? "End now" : "Cancel"}</button>` : ""}
+      </div>`;
+    }).join("") || `<p class="muted small" style="margin:0;">No events yet.</p>`;
+    $$("[data-ev-end]", box).forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("End this event now?")) return;
+      const { error: e2 } = await sb.from("events").update({ ends_at: new Date().toISOString() }).eq("id", b.dataset.evEnd);
+      if (e2) return toast("Couldn't end it.");
+      toast("Event ended");
+      loadAdminEvents();
+      loadEvents();
+    }));
+  }
+  $("#ev-go", view).addEventListener("click", async () => {
+    const multiplier = +$("#ev-mult", view).value;
+    const kind = $("#ev-kind", view).value;
+    let start = new Date();
+    if (evStart.value === "later") {
+      const v = $("#ev-start-at", view).value;
+      if (!v) return toast("Pick when the event starts.");
+      start = new Date(v);
+    }
+    const len = $("#ev-len", view).value;
+    let end;
+    if (len === "day") { end = new Date(start); end.setHours(23, 59, 59, 0); }
+    else end = new Date(start.getTime() + +len * 60000);
+    if (end <= Date.now()) return toast("That event would already be over.");
+    const title = $("#ev-title", view).value.trim() || null;
+    const ev = { kind, multiplier, title, starts_at: start.toISOString(), ends_at: end.toISOString(), created_by: authUser.id };
+    if (!confirm(`Start "${eventName(ev)}" (${multiplier}× ${EVENT_KINDS[kind].label} ${EVENT_KINDS[kind].note})\n${fmtDateTime(ev.starts_at)} → ${fmtDateTime(ev.ends_at)}?`)) return;
+    const { error } = await sb.from("events").insert(ev);
+    if (error) return toast("Couldn't start it — check events.sql has been run.");
+    if ($("#ev-announce", view).checked) {
+      const soon = start > Date.now() ? ` starts ${fmtDateTime(ev.starts_at)}` : " is ON now";
+      await sb.from("announcements").update({ active: false }).eq("active", true);
+      await sb.from("announcements").insert({ message: `⚡ ${eventName(ev)}${soon}! ${multiplier}× ${EVENT_KINDS[kind].label} ${EVENT_KINDS[kind].note} until ${fmtDateTime(ev.ends_at)}.`, created_by: authUser.id });
+      loadAnnouncements();
+    }
+    $("#ev-title", view).value = "";
+    toast("Event started");
+    loadAdminEvents();
+    loadEvents();
+  });
+  loadAdminEvents();
 
   // ----- Feedback -----
   async function loadFeedback() {

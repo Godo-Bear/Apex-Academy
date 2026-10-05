@@ -383,3 +383,15 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
 .mc-opt:has(input:disabled) { cursor: default; }
 .mc .mc-opt.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
 .mc .mc-opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.question .passage { white-space: pre-wrap; background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin: 4px 0 12px; line-height: 1.6; }
+.question textarea { width: 100%; min-height: 80px; }
+.question textarea.correct { border-color: var(--good); }
+.question textarea.wrong { border-color: var(--bad); }
+
+/* Boost events */
+#event-bar { margin: 0 0 16px; display: grid; gap: 8px; }
+.event-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; color: #1a1300;
+  background: linear-gradient(90deg, #ffd34d, #ffb020); box-shadow: var(--shadow); font-size: 14px; }
+.event-bolt { font-size: 20px; }
+.event-time { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.event-tag { background: #ffd34d; color: #1a1300; font-weight: 700; }

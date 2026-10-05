@@ -46,3 +46,9 @@ run `supabase/writings.sql` once in the Supabase SQL Editor.
 
 Admins can send an announcement to everyone from the Admin page. Run `supabase/announcements.sql`
 once in the Supabase SQL Editor to turn this on.
+
+## Events
+
+Admins can run boost events (Double Points, Triple XP, tests-only or practice-only boosts) from the
+Admin page. Everyone sees a banner while one is on. Run `supabase/events.sql` once in the Supabase
+SQL Editor to turn this on.
