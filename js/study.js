@@ -230,9 +230,9 @@ function flashcardsMode(view, host) {
   save();
 
   host.innerHTML = `
-    <div class="study-grid">
-      <div class="card stack" id="fc-main"></div>
-      <div class="card stack study-side"><h3 style="margin:0;">💬 Ask the AI</h3><div id="fc-chat"></div></div>
+    <div class="stack">
+      <div class="card stack"><h3 style="margin:0;">💬 Ask the AI</h3><div id="fc-chat"></div></div>
+      <div class="stack" id="fc-main"></div>
     </div>`;
   const main = $("#fc-main", host);
 
@@ -266,8 +266,7 @@ function flashcardsMode(view, host) {
     let body;
     if (!cards.length) {
       body = `<div class="study-empty"><div class="study-empty-ico">🃏</div>
-        <p><b>This deck is empty.</b><br>Ask the AI to make flashcards on anything — or add your own below.</p>
-        <div class="chips">${["10 flashcards on the water cycle", "Spanish words for colours", "Times tables 6 to 9", "Parts of a plant cell"].map((x) => `<button type="button" class="btn secondary sm" data-idea>${esc(x)}</button>`).join("")}</div></div>`;
+        <p><b>This deck is empty.</b><br>Ask the AI at the top to make flashcards on anything, or make your own above.</p></div>`;
     } else if (!fcView.order.length) {
       body = `<div class="study-empty"><div class="study-empty-ico">🎉</div><p><b>You know every card in this deck!</b></p>
         <button class="btn" id="fc-all" type="button">Study all cards again</button></div>`;
@@ -307,16 +306,19 @@ function flashcardsMode(view, host) {
         </div>`;
     }
     const list = `
-      <details class="fc-list"${cards.length ? "" : " open"}><summary>✏️ All cards (${cards.length}) — edit or add your own</summary>
-        ${cards.length ? `<ol>${cards.map((c, i) => `${c.own && (i === 0 || !cards[i - 1].own) ? `<li class="fc-divider">Your own cards</li>` : ""}<li data-i="${i}"><span class="fc-li-text"><b>${esc(c.f)}</b><span>${esc(c.b)}</span></span>
-          <span class="fc-li-actions"><button class="btn ghost sm" type="button" data-edit="${i}" aria-label="Edit card ${i + 1}">✏️</button><button class="btn ghost sm" type="button" data-del="${i}" aria-label="Delete card ${i + 1}">✕</button></span></li>`).join("")}</ol>` : ""}
+      <div class="card stack">
+        <h3 style="margin:0;">✏️ Make your own cards</h3>
         <form class="fc-add" id="fc-add" autocomplete="off">
           <input type="text" name="f" placeholder="Front — a question or word" maxlength="200">
           <input type="text" name="b" placeholder="Back — the answer" maxlength="400">
           <button class="btn sm" type="submit">Add card</button>
         </form>
-      </details>`;
-    main.innerHTML = head + body + list;
+        ${cards.length ? `<details class="fc-list"><summary>All cards in “${esc(deck.name)}” (${cards.length}) — edit or delete</summary>
+          <ol>${cards.map((c, i) => `${c.own && (i === 0 || !cards[i - 1].own) ? `<li class="fc-divider">Your own cards</li>` : ""}<li data-i="${i}"><span class="fc-li-text"><b>${esc(c.f)}</b><span>${esc(c.b)}</span></span>
+          <span class="fc-li-actions"><button class="btn ghost sm" type="button" data-edit="${i}" aria-label="Edit card ${i + 1}">✏️</button><button class="btn ghost sm" type="button" data-del="${i}" aria-label="Delete card ${i + 1}">✕</button></span></li>`).join("")}</ol>
+        </details>` : ""}
+      </div>`;
+    main.innerHTML = list + `<div class="card stack">${head + body}</div>`;
     wire();
   }
 
@@ -404,7 +406,7 @@ function flashcardsMode(view, host) {
       save();
       resetView(true);
       draw();
-      $(".fc-list", main).open = true;
+      { const l = $(".fc-list", main); if (l) l.open = true; }
     }));
     $$("[data-edit]", main).forEach((b) => b.addEventListener("click", () => {
       const i = +b.dataset.edit, c = deck.cards[i], li = b.closest("li");
@@ -417,7 +419,7 @@ function flashcardsMode(view, host) {
         Object.assign(c, { f, b: back });
         save();
         draw();
-        $(".fc-list", main).open = true;
+        { const l = $(".fc-list", main); if (l) l.open = true; }
       });
       $("input", li).focus();
     }));
@@ -429,7 +431,7 @@ function flashcardsMode(view, host) {
       save();
       resetView(true);
       draw();
-      $(".fc-list", main).open = true;
+      { const l = $(".fc-list", main); if (l) l.open = true; }
       $("#fc-add input", main).focus();
     });
   }
