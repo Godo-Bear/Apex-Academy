@@ -419,8 +419,6 @@ async function logout() {
   history.replaceState(null, "", location.pathname);
   showAuthPanel("main");
 }
-$("#logout").addEventListener("click", logout);
-$("#logout-m").addEventListener("click", logout);
 $("#paywall-logout").addEventListener("click", logout);
 $("#paywall-recheck").addEventListener("click", async () => {
   const { data: { session } } = await sb.auth.getSession();
