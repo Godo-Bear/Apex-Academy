@@ -677,7 +677,7 @@
       case "order": return `Items to put in order: ${list(v.items)}`;
       case "match": return `Pairs to match: ${list((v.pairs || []).map((p) => `${p[0]} ↔ ${p[1]}`))}`;
       case "tapword": return `Sentence: ${String(v.text || "").replace(/\*/g, "")}`;
-      default: return "";
+      default: return EXTRA_DESCRIBE[v.type] ? EXTRA_DESCRIBE[v.type](v) : "";
     }
   }
 
@@ -690,6 +690,8 @@
     balance: balanceSVG, machine: machineHTML, table: tableHTML, pattern: patternSVG, array: arraySVG, pv: pvHTML,
   };
   const INPUTS = new Set(["plot", "place", "shade", "angleMake", "order", "match", "tapword"]);
+  // Extra diagrams and answer widgets added by other files (e.g. sci-visuals.js) through registerVisuals().
+  const EXTRA_DESCRIBE = {};
 
   // ---------------------------------------------------------------- Tap-the-word tokens
   function tapTokens(text) {
@@ -753,7 +755,7 @@
           : `<span class="vz-punct">${h(tk.t)}${h(tk.after || "")}</span>`)).join(" ")}</div>
           <p class="vz-hint">${n > 1 ? `Tap ${n} words.` : "Tap one word."}</p></div>`;
       }
-      default: return "";
+      default: return W[v.type]?.html ? `<div class="vz-widget" data-w="${h(v.type)}">${W[v.type].html(v, q)}</div>` : "";
     }
   }
 
@@ -1053,7 +1055,7 @@
       case "order": return raw === [...Array(v.items.length).keys()].join(",");
       case "match": return raw === [...Array(v.pairs.length).keys()].join(",");
       case "tapword": return raw === tapTargets(v).join(",");
-      default: return false;
+      default: return W[v.type]?.correct ? !!W[v.type].correct(v, raw) : false;
     }
   }
   function visualAnswerText(q) {
@@ -1066,7 +1068,7 @@
       case "order": return v.items.join(" › ");
       case "match": return v.pairs.map((p) => `${p[0]} → ${p[1]}`).join(", ");
       case "tapword": { const toks = tapTokens(v.text); return tapTargets(v).map((i) => `"${toks[i].t}"`).join(", "); }
-      default: return "";
+      default: return W[v.type]?.answer ? W[v.type].answer(v) : "";
     }
   }
   function visualYourAnswer(q, raw) {
@@ -1081,7 +1083,7 @@
       case "order": return raw.startsWith("partial") ? "(not finished)" : raw.split(",").map((i) => v.items[+i]).join(" › ");
       case "match": return raw === "partial" ? "(not finished)" : "your matches";
       case "tapword": { const toks = tapTokens(v.text); return raw.split(",").map((i) => `"${toks[+i]?.t ?? ""}"`).join(", "); }
-      default: return raw;
+      default: return W[v.type]?.yours ? W[v.type].yours(v, raw) : raw;
     }
   }
 
@@ -1432,7 +1434,9 @@
   function isVisualInput(q) { return !!(q && q.visual && INPUTS.has(q.visual.type)); }
   function visualHTML(q) {
     if (!q || !q.visual) return "";
-    if (isVisualInput(q)) return `<div class="vz vz-input">${widgetHTML(q)}</div>`;
+    // An answer widget can carry a picture to look at too: visual.fig = { type: "<diagram>", ... }.
+    const fig = q.visual.fig && DIAGRAMS[q.visual.fig.type] ? `<div class="vz-fig">${DIAGRAMS[q.visual.fig.type](q.visual.fig)}</div>` : "";
+    if (isVisualInput(q)) return `<div class="vz vz-input">${fig}${widgetHTML(q)}</div>`;
     const draw = DIAGRAMS[q.visual.type];
     return draw ? `<div class="vz">${draw(q.visual)}</div>` : "";
   }
@@ -1491,7 +1495,18 @@
     W[q.visual.type].result(el, q, raw);
   }
 
+  // Lets another file add diagrams ({ name: (v) => svg }), descriptions and answer widgets
+  // ({ name: { html(v, q), wire(el, q, set), result(el, q, raw), correct(v, raw), answer(v), yours(v, raw) } }).
+  function registerVisuals({ diagrams = {}, describe: desc = {}, inputs = {} } = {}) {
+    Object.assign(DIAGRAMS, diagrams);
+    Object.assign(EXTRA_DESCRIBE, desc);
+    Object.entries(inputs).forEach(([name, w]) => { W[name] = w; INPUTS.add(name); });
+    window.VISUAL_TYPES = [...Object.keys(DIAGRAMS), ...INPUTS];
+  }
+  const VZ_KIT = { h, num, r1, fmt, rad, svgOpen, txt, line, arrowHead, colorOf, PALETTE, scramble, shuffled, describe, all: (root, sel) => [...root.querySelectorAll(sel)] };
+
   Object.assign(window, {
+    registerVisuals, VZ_KIT,
     isVisualInput, visualHTML, pointInputHTML, wireQuestion, markVisual, visualCorrect, pointCorrect,
     visualAnswerText, visualYourAnswer, describeVisual: describe, cleanVisual, tapTokens, explorerHTML, wireExplorer,
     VISUAL_TYPES: [...Object.keys(DIAGRAMS), ...INPUTS],

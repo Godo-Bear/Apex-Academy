@@ -1,6 +1,6 @@
 # Apex Learning Academy
 
-Year 7 Victorian Curriculum maths and English practice.
+Year 7 Victorian Curriculum maths, English and science practice.
 
 A cleaner rebuild of the original single-file site (kept in `legacy/index.html` for reference).
 It uses the same Supabase project, so existing accounts, points and progress carry over.
@@ -14,6 +14,8 @@ It uses the same Supabase project, so existing accounts, points and progress car
 | `js/data.js` | Topics, questions, diagrams and writing prompts |
 | `js/lessons.js` | The "Learn" explanation for each topic |
 | `js/visuals.js` | Diagrams and interactive answers (Cartesian plane, number lines, shading, protractor, order, match, tap-the-word) plus the Learn tab's "Try it" explorers |
+| `js/sci-visuals.js` | Science diagrams (particles, Moon phases, seasons, tides, forces, levers, pulleys, lab equipment, separating set-ups, chromatograms, food webs, keys…) plus the tap-the-picture and sort answer widgets |
+| `js/science.js` | The 8 Year 7 science topics (Science toolkit, Classification, Ecosystems, Resources, Earth Sun and Moon, Forces, Particle theory, Mixtures) with lessons and ~45 questions each |
 | `js/bank.js` | Upgrades to the question bank: tap-to-answer choices, diagrams on existing questions, new interactive questions, and the Cartesian Plane topic |
 | `js/study.js` | The Test page's AI modes: AI test chat, flashcards, and info & ideas pages |
 | `js/app.js` | App logic: auth, routing, pages, Supabase sync |

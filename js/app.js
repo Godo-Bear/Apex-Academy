@@ -85,8 +85,9 @@ const NAV = [
 // ---------------- Topics ----------------
 YEAR_LEVELS.forEach((y) => y.topics.forEach((t) => { t.subject = "maths"; t.yearId = y.id; }));
 ENGLISH_TOPICS.forEach((t) => { t.subject = "english"; });
+SCIENCE_TOPICS.forEach((t) => { t.subject = "science"; });
 const MATHS_TOPICS = YEAR_LEVELS.flatMap((y) => y.topics);
-const ALL_TOPICS = [...MATHS_TOPICS, ...ENGLISH_TOPICS];
+const ALL_TOPICS = [...MATHS_TOPICS, ...ENGLISH_TOPICS, ...SCIENCE_TOPICS];
 const QUIZ_TOPICS = ALL_TOPICS.filter((t) => !t.special);
 const findTopic = (id) => ALL_TOPICS.find((t) => t.id === id);
 
@@ -498,9 +499,10 @@ function enterApp() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-04c";
+const TERMS_VERSION = "2026-10-06a";
 const TERMS_CHANGES = [
-  "Access is $15 AUD every 6 months, paid cash in hand to the site owner.",
+  "Price drop: access is now $10 AUD every 6 months (was $15), paid cash in hand to the site owner.",
+  "Apex Academy now covers science as well as maths and English.",
   "Accounts are unlocked by hand, so it may take a while after paying. No refunds.",
   "Using the AI: it's for learning. Don't hand in AI-written work as your own.",
   "Behaviour: be respectful, or your account may be suspended.",
@@ -731,7 +733,7 @@ function pageHome(view) {
       ${$("#crest-tpl").innerHTML}
       <div>
         <h2><b>Apex</b> Learning Academy</h2>
-        <p>Year 7 Maths &amp; English · Victorian Curriculum</p>
+        <p>Year 7 Maths, English &amp; Science · Victorian Curriculum</p>
       </div>
     </div>
     <div class="page-head">
@@ -838,6 +840,8 @@ function pagePractice(view, topicId) {
       <div class="grid topics">${y.topics.map(topicCard).join("")}</div>`).join("")}
     <div class="section-label">English</div>
     <div class="grid topics">${ENGLISH_TOPICS.map(topicCard).join("")}</div>
+    <div class="section-label">Science</div>
+    <div class="grid topics">${SCIENCE_TOPICS.map(topicCard).join("")}</div>
   `;
 }
 
@@ -1862,6 +1866,10 @@ function pickBuilder(view, host) {
         <div class="checklist" data-group="english">${checklist(englishQuiz)}</div>
       </div>
       <div>
+        <div class="row between"><label class="field">Science topics</label><button class="btn ghost sm" data-all="science">Select all</button></div>
+        <div class="checklist" data-group="science">${checklist(SCIENCE_TOPICS)}</div>
+      </div>
+      <div>
         <label class="field">Difficulty</label>
         <div class="checklist" id="t-diff">
           ${[1, 2, 3].map((d) => `<label class="chip-check"><input type="checkbox" value="${d}" checked> ${DIFF_NAMES[d]}</label>`).join("")}
@@ -2444,7 +2452,7 @@ function pageSettings(view) {
     <div class="section-label">My subscription</div>
     <div class="card stack">
       <p style="margin:0;">${subText}</p>
-      <p class="muted small" style="margin:0;">To renew, pay <strong>$15 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so it may take a while.</p>
+      <p class="muted small" style="margin:0;">To renew, pay <strong>$10 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so it may take a while.</p>
     </div>
 
     <div class="section-label">Appearance</div>

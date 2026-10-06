@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apex Learning Academy</title>
-<meta name="description" content="Year 7 Victorian Curriculum maths and English practice.">
+<meta name="description" content="Year 7 Victorian Curriculum maths, English and science practice.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
@@ -36,7 +36,7 @@
 <div id="screen-auth" class="center-screen hidden">
   <div class="card auth-card">
     <div class="logo logo-stack" data-logo><span class="wordmark"><b>Apex</b> Learning Academy</span></div>
-    <p class="muted small" style="text-align:center;">Year 7 Maths &amp; English · Victorian Curriculum</p>
+    <p class="muted small" style="text-align:center;">Year 7 Maths, English &amp; Science · Victorian Curriculum</p>
 
     <div id="auth-main">
       <div class="segmented" style="margin-top:14px;">
@@ -57,7 +57,7 @@
           <input type="password" id="auth-password" autocomplete="current-password" required minlength="6">
         </div>
         <label id="auth-terms-field" class="small muted hidden" style="display:flex; gap:8px; align-items:flex-start;">
-          <input type="checkbox" id="auth-terms"> <span>I agree to the <a href="#" data-open="terms">Terms &amp; Conditions</a> ($15 for 6 months, cash in hand, no refunds)</span>
+          <input type="checkbox" id="auth-terms"> <span>I agree to the <a href="#" data-open="terms">Terms &amp; Conditions</a> ($10 for 6 months, cash in hand, no refunds)</span>
         </label>
         <div id="auth-msg" class="hidden"></div>
         <button type="submit" id="auth-submit" class="btn block">Log in</button>
@@ -90,7 +90,7 @@
   <div class="card auth-card" style="text-align:center;">
     <div class="logo logo-stack" data-logo><span class="wordmark"><b>Apex</b> Learning Academy</span></div>
     <h2 style="margin-top:20px;">Almost there</h2>
-    <p class="muted">Your account (<strong id="paywall-email"></strong>) isn't active yet. Access is <strong>$15 for 6 months, paid cash in hand</strong> to the site owner. The owner unlocks accounts by hand, so it may take a while after you've paid. Once it's unlocked, check again.</p>
+    <p class="muted">Your account (<strong id="paywall-email"></strong>) isn't active yet. Access is <strong>$10 for 6 months, paid cash in hand</strong> to the site owner. The owner unlocks accounts by hand, so it may take a while after you've paid. Once it's unlocked, check again.</p>
     <p class="small"><a href="#" data-open="terms">Terms &amp; Conditions</a></p>
     <button id="paywall-recheck" class="btn block">I've paid — check again</button>
     <button id="paywall-logout" class="btn ghost" style="margin-top:8px;">Log out</button>
@@ -171,7 +171,7 @@
   <div class="card stack">
     <h2 style="margin:0;">⏰ Your access is ending soon</h2>
     <p id="renew-text" style="margin:0;"></p>
-    <p class="muted small" style="margin:0;">To keep using Apex Academy, pay <strong>$15 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so pay early. It may take a while to be renewed. Your progress is kept either way.</p>
+    <p class="muted small" style="margin:0;">To keep using Apex Academy, pay <strong>$10 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so pay early. It may take a while to be renewed. Your progress is kept either way.</p>
     <div class="row between">
       <button class="btn ghost" data-open="terms">Terms and Conditions</button>
       <button class="btn" id="renew-ok">Got it</button>
@@ -184,9 +184,9 @@
   <div class="card stack" style="max-width:560px;">
     <div class="row between"><h2 style="margin:0;">Terms and Conditions</h2><button class="btn ghost" data-close>✕</button></div>
     <div class="small muted" style="max-height:60vh; overflow-y:auto;">
-      <p><strong>1. What this is.</strong> Apex Learning Academy is a paid maths and English practice site covering the Year 7 Victorian Curriculum. Access costs <strong>$15 AUD every 6 months</strong> per account.</p>
+      <p><strong>1. What this is.</strong> Apex Learning Academy is a paid maths, English and science practice site covering the Year 7 Victorian Curriculum. Access costs <strong>$10 AUD every 6 months</strong> per account.</p>
       <p><strong>2. Payment.</strong> Payment is <strong>cash in hand only</strong>, paid directly to the site owner. No card, bank transfer or online payments are accepted, and nothing is charged through this website. Accounts are unlocked by hand by the owner, so <strong>it may take a while for your account to be unlocked</strong> after you've paid (usually within a few days). Your 6 months start from the day your account is unlocked.</p>
-      <p><strong>3. Renewing.</strong> To keep using the site after 6 months, pay another $15 cash in hand. If you don't renew, your account is paused until you do; your progress is kept.</p>
+      <p><strong>3. Renewing.</strong> To keep using the site after 6 months, pay another $10 cash in hand. If you don't renew, your account is paused until you do; your progress is kept.</p>
       <p class="terms-refund"><strong>4. No refunds.</strong> All payments are final. <strong>No refunds will be given</strong> once payment has been made, including if you stop using the site before your 6 months are up.</p>
       <p><strong>5. Accounts.</strong> One account is for one person only. You must not share your login with friends or family, or resell your account. You are responsible for keeping your password private.</p>
       <p><strong>6. Using the AI.</strong> The AI tutor, essay feedback, evidence and AI-made tests are there to help you learn. Do not hand in AI-written work as your own at school. The AI can make mistakes, so check important facts, and always check evidence with its source before you quote it.</p>
@@ -204,6 +204,8 @@
 <script src="js/data.js?v=20261006h"></script>
 <script src="js/lessons.js?v=20261006h"></script>
 <script src="js/visuals.js?v=20261006h"></script>
+<script src="js/sci-visuals.js?v=20261006h"></script>
+<script src="js/science.js?v=20261006h"></script>
 <script src="js/bank.js?v=20261006h"></script>
 <script src="js/study.js?v=20261006h"></script>
 <script src="js/app.js?v=20261006h"></script>
