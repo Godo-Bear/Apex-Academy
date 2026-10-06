@@ -1819,7 +1819,7 @@ Tutor:`;
 // an AI-built test, flashcards, and info & ideas pages, each with a full chat.
 let testMode = "pick";
 const TEST_MODES = [
-  { id: "pick", icon: "🧩", name: "Pick topics", text: "A test from the question bank" },
+  { id: "pick", icon: "🧩", name: "Pick topics" },
   { id: "chat", icon: "💬", name: "AI test" },
   { id: "cards", icon: "🃏", name: "Flashcards" },
   { id: "info", icon: "💡", name: "Info & ideas" },
