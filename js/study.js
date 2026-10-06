@@ -219,6 +219,7 @@ function flashcardsMode(view, host) {
   const state = loadDecks();
   let deck = state.decks.find((d) => d.id === state.current) || state.decks[state.decks.length - 1];
   if (!deck) { deck = newDeck(); state.decks.push(deck); }
+  state.decks.forEach((d) => { d.cards = [...d.cards.filter((c) => !c.own), ...d.cards.filter((c) => c.own)]; });
   state.current = deck.id;
   const save = () => {
     deck.updated = Date.now();
@@ -302,11 +303,12 @@ function flashcardsMode(view, host) {
           <label class="chip-check"><input type="checkbox" id="fc-only"${fcView.onlyLearning ? " checked" : ""}> Only still learning</label>
           <button class="btn ghost sm" id="fc-reset" type="button">↺ Reset</button>
           <button class="btn ghost sm" id="fc-quiz" type="button">📝 Quiz me</button>
+          <button class="btn ghost sm" id="fc-pdf" type="button">🖨️ Save as PDF</button>
         </div>`;
     }
     const list = `
       <details class="fc-list"${cards.length ? "" : " open"}><summary>✏️ All cards (${cards.length}) — edit or add your own</summary>
-        ${cards.length ? `<ol>${cards.map((c, i) => `<li data-i="${i}"><span class="fc-li-text"><b>${esc(c.f)}</b><span>${esc(c.b)}</span></span>
+        ${cards.length ? `<ol>${cards.map((c, i) => `${c.own && (i === 0 || !cards[i - 1].own) ? `<li class="fc-divider">Your own cards</li>` : ""}<li data-i="${i}"><span class="fc-li-text"><b>${esc(c.f)}</b><span>${esc(c.b)}</span></span>
           <span class="fc-li-actions"><button class="btn ghost sm" type="button" data-edit="${i}" aria-label="Edit card ${i + 1}">✏️</button><button class="btn ghost sm" type="button" data-del="${i}" aria-label="Delete card ${i + 1}">✕</button></span></li>`).join("")}</ol>` : ""}
         <form class="fc-add" id="fc-add" autocomplete="off">
           <input type="text" name="f" placeholder="Front — a question or word" maxlength="200">
@@ -395,6 +397,7 @@ function flashcardsMode(view, host) {
         draw();
       });
       $("#fc-quiz", main).addEventListener("click", quiz);
+      $("#fc-pdf", main).addEventListener("click", () => printDeck(deck));
     }
     $$("[data-del]", main).forEach((b) => b.addEventListener("click", () => {
       deck.cards.splice(+b.dataset.del, 1);
@@ -422,7 +425,7 @@ function flashcardsMode(view, host) {
       e.preventDefault();
       const f = e.target.f.value.trim(), back = e.target.b.value.trim();
       if (!f || !back) return toast("Fill in both sides of the card.");
-      deck.cards.push({ f, b: back });
+      deck.cards.push({ f, b: back, own: true });
       save();
       resetView(true);
       draw();
@@ -497,7 +500,9 @@ Reply with ONLY valid JSON, no markdown:
       const fronts = new Set(deck.cards.map((c) => c.f.toLowerCase()));
       const fresh = incoming.filter((c) => !fronts.has(c.f.toLowerCase())).slice(0, Math.max(0, 300 - deck.cards.length));
       const wasEmpty = !deck.cards.length;
-      deck.cards.push(...fresh);
+      const firstOwn = deck.cards.findIndex((c) => c.own);
+      if (firstOwn < 0) deck.cards.push(...fresh);
+      else { deck.cards.splice(firstOwn, 0, ...fresh); fcView.deckId = null; } // AI cards go before your own ones
       if (fresh.length) notes.push(`✓ Added ${fresh.length} card${fresh.length === 1 ? "" : "s"} to “${deck.name}”`);
       resetView(!wasEmpty);
       return { text: aiReplyText(raw, data) || (fresh.length ? "Here are your flashcards!" : "Okay!"), note: notes.join(" · ") };
@@ -693,4 +698,33 @@ Reply with ONLY valid JSON, no markdown:
   });
 
   draw();
+}
+
+// Printable cue cards: 8 per A4 page. Each question page is followed by its answer page, with the
+// columns mirrored so that printing double-sided (flip on long edge) puts every answer behind its question.
+function printDeck(deck) {
+  const cards = deck.cards.filter((c) => c.f && c.b);
+  if (!cards.length) return toast("Add some cards first.");
+  const PER = 8, COLS = 2;
+  const size = (t) => (t.length > 140 ? " xl" : t.length > 60 ? " l" : "");
+  const cell = (c, n, side) => (c
+    ? `<div class="pc"><span class="pc-tag">${side === "f" ? "Q" : "A"}${n}</span><div class="pc-text${size(side === "f" ? c.f : c.b)}">${esc(side === "f" ? c.f : c.b)}</div><span class="pc-deck">${esc(deck.name)}</span></div>`
+    : `<div class="pc pc-empty"></div>`);
+  let html = "";
+  for (let p = 0; p < cards.length; p += PER) {
+    const chunk = cards.slice(p, p + PER);
+    while (chunk.length < PER) chunk.push(null);
+    html += `<section class="pp">${chunk.map((c, i) => cell(c, p + i + 1, "f")).join("")}</section>`;
+    const mirrored = [];
+    for (let r = 0; r < PER / COLS; r++) for (let col = COLS - 1; col >= 0; col--) mirrored.push(r * COLS + col);
+    html += `<section class="pp">${mirrored.map((i) => cell(chunk[i], p + i + 1, "b")).join("")}</section>`;
+  }
+  let host = document.getElementById("print-cards");
+  if (!host) { host = document.createElement("div"); host.id = "print-cards"; document.body.appendChild(host); }
+  host.innerHTML = html;
+  document.body.classList.add("printing-cards");
+  const done = () => { document.body.classList.remove("printing-cards"); window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  toast("Choose “Save as PDF”. To print, use double-sided, flip on long edge.");
+  setTimeout(() => window.print(), 400);
 }

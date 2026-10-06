@@ -633,3 +633,22 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
 .vz-arrow-g { transition: transform 1s cubic-bezier(.2,.7,.2,1); }
 .vz-tilt { transition: transform .35s ease; }
 .vz-spin { display: flex; justify-content: center; }
+.fc-list li.fc-divider { list-style: none; margin: 8px 0 0 -22px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+
+/* Printable cue cards (Flashcards → Save as PDF) */
+#print-cards { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 10mm; }
+  body.printing-cards { background: #fff !important; }
+  body.printing-cards > *:not(#print-cards) { display: none !important; }
+  body.printing-cards #print-cards { display: block; }
+  .pp { width: 190mm; height: 276mm; display: grid; grid-template-columns: repeat(2, 95mm); grid-template-rows: repeat(4, 69mm); break-after: page; page-break-after: always; }
+  .pp:last-child { break-after: auto; page-break-after: auto; }
+  .pc { box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: center; padding: 9mm 8mm; overflow: hidden; text-align: center; color: #000; border: 0.25mm dashed #9a9a9a; font-family: Inter, Arial, sans-serif; }
+  .pc-empty { border-color: #e2e2e2; }
+  .pc-text { font-size: 15pt; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+  .pc-text.l { font-size: 12pt; }
+  .pc-text.xl { font-size: 10pt; font-weight: 600; }
+  .pc-tag { position: absolute; top: 3mm; left: 4mm; font-size: 8pt; font-weight: 700; color: #777; }
+  .pc-deck { position: absolute; bottom: 3mm; right: 4mm; font-size: 7pt; color: #aaa; }
+}
