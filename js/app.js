@@ -1822,9 +1822,9 @@ Tutor:`;
 let testMode = "pick";
 const TEST_MODES = [
   { id: "pick", icon: "🧩", name: "Pick topics", text: "A test from the question bank" },
-  { id: "chat", icon: "💬", name: "AI test", text: "Chat to build a test on anything" },
-  { id: "cards", icon: "🃏", name: "Flashcards", text: "Make cards and flip through them" },
-  { id: "info", icon: "💡", name: "Info & ideas", text: "Learn about any topic" },
+  { id: "chat", icon: "💬", name: "AI test" },
+  { id: "cards", icon: "🃏", name: "Flashcards" },
+  { id: "info", icon: "💡", name: "Info & ideas" },
 ];
 let switchStudyMode = null; // set while the Test page is showing
 
@@ -1832,7 +1832,7 @@ function pageTest(view) {
   view.innerHTML = `
     <div class="page-head"><h1>Test & study</h1><p>Build a test, chat with the AI, make flashcards, or get info and ideas on anything.</p></div>
     <div class="mode-grid" id="t-mode" role="tablist">
-      ${TEST_MODES.map((m) => `<button type="button" role="tab" class="mode-btn" data-mode="${m.id}"><span class="mode-ico">${m.icon}</span><span class="mode-txt"><b>${m.name}</b><small>${m.text}</small></span></button>`).join("")}
+      ${TEST_MODES.map((m) => `<button type="button" role="tab" class="mode-btn" data-mode="${m.id}"><span class="mode-ico">${m.icon}</span><span class="mode-txt"><b>${m.name}</b>${m.text ? `<small>${m.text}</small>` : ""}</span></button>`).join("")}
     </div>
     <div id="mode-host"></div>`;
   const host = $("#mode-host", view);
