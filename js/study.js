@@ -714,10 +714,10 @@ function printDeck(deck) {
   for (let p = 0; p < cards.length; p += PER) {
     const chunk = cards.slice(p, p + PER);
     while (chunk.length < PER) chunk.push(null);
-    html += `<section class="pp">${chunk.map((c, i) => cell(c, p + i + 1, "f")).join("")}</section>`;
+    html += `<section class="pp"><div class="pp-head">QUESTIONS · ${esc(deck.name)} · <b>Print double-sided — flip on long edge</b> so each answer lands behind its question</div>${chunk.map((c, i) => cell(c, p + i + 1, "f")).join("")}</section>`;
     const mirrored = [];
     for (let r = 0; r < PER / COLS; r++) for (let col = COLS - 1; col >= 0; col--) mirrored.push(r * COLS + col);
-    html += `<section class="pp">${mirrored.map((i) => cell(chunk[i], p + i + 1, "b")).join("")}</section>`;
+    html += `<section class="pp"><div class="pp-head">ANSWERS · back of the page before (A1 sits behind Q1)</div>${mirrored.map((i) => cell(chunk[i], p + i + 1, "b")).join("")}</section>`;
   }
   let host = document.getElementById("print-cards");
   if (!host) { host = document.createElement("div"); host.id = "print-cards"; document.body.appendChild(host); }
@@ -725,6 +725,6 @@ function printDeck(deck) {
   document.body.classList.add("printing-cards");
   const done = () => { document.body.classList.remove("printing-cards"); window.removeEventListener("afterprint", done); };
   window.addEventListener("afterprint", done);
-  toast("Choose “Save as PDF”. To print, use double-sided, flip on long edge.");
-  setTimeout(() => window.print(), 400);
+  if (!confirm("Your cue cards are ready (8 per page).\n\n• To keep them: choose \"Save as PDF\" in the print box.\n• To print: turn on DOUBLE-SIDED and choose FLIP ON LONG EDGE, so every answer prints right behind its question.\n\nOpen the print box now?")) { done(); return; }
+  setTimeout(() => window.print(), 300);
 }

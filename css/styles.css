@@ -642,7 +642,9 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
   body.printing-cards { background: #fff !important; }
   body.printing-cards > *:not(#print-cards) { display: none !important; }
   body.printing-cards #print-cards { display: block; }
-  .pp { width: 190mm; height: 276mm; display: grid; grid-template-columns: repeat(2, 95mm); grid-template-rows: repeat(4, 69mm); break-after: page; page-break-after: always; }
+  .pp { width: 190mm; height: 276mm; display: grid; grid-template-columns: repeat(2, 95mm); grid-template-rows: 8mm repeat(4, 67mm); break-after: page; page-break-after: always; }
+  .pp-head { grid-column: 1 / -1; display: block; line-height: 8mm; white-space: nowrap; overflow: hidden; font: 600 8.5pt Inter, Arial, sans-serif; color: #555; text-align: center; }
+  .pp-head b { color: #000; margin-left: 1mm; }
   .pp:last-child { break-after: auto; page-break-after: auto; }
   .pc { box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: center; padding: 9mm 8mm; overflow: hidden; text-align: center; color: #000; border: 0.25mm dashed #9a9a9a; font-family: Inter, Arial, sans-serif; }
   .pc-empty { border-color: #e2e2e2; }
