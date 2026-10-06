@@ -139,6 +139,8 @@ function setMsg(el, text, kind) {
 }
 
 function isAnswerCorrect(q, raw) {
+  if (isVisualInput(q)) return visualCorrect(q, raw);
+  if (q.answerType === "point") return pointCorrect(q, raw);
   if (q.answerType === "text") {
     if (typeof raw !== "string" || raw.trim() === "") return false;
     const normalized = raw.trim().toLowerCase();
@@ -149,7 +151,10 @@ function isAnswerCorrect(q, raw) {
   const tol = q.tolerance ?? 0.01;
   return !isNaN(val) && Math.abs(val - q.answer) <= tol;
 }
-const displayAnswer = (q) => (Array.isArray(q.answer) ? q.answer[0] : q.answer);
+const displayAnswer = (q) => (isVisualInput(q) ? visualAnswerText(q) : Array.isArray(q.answer) ? q.answer[0] : q.answer);
+// The student's answer in words, for "You answered: …".
+const yourAnswerText = (q, raw) => (isVisualInput(q) ? visualYourAnswer(q, raw)
+  : q.answerType === "point" ? (raw ? `(${String(raw).split(",").join(", ")})` : "(blank)") : raw || "(blank)");
 
 function cleanTutorAnswer(text) {
   return text
@@ -166,12 +171,16 @@ function cleanTutorAnswer(text) {
     .trim();
 }
 
-async function askTutor(body) {
+// The tutor's answer exactly as written (for replies that are JSON).
+async function askTutorRaw(body) {
   const { data, error } = await sb.functions.invoke("ask-tutor", { body: typeof body === "string" ? { question: body } : body });
   if (error) throw error;
   if (data?.error) throw new Error(data.error);
   if (!data?.answer) throw new Error("Empty answer");
-  return cleanTutorAnswer(data.answer);
+  return String(data.answer);
+}
+async function askTutor(body) {
+  return cleanTutorAnswer(await askTutorRaw(body));
 }
 
 // ---------------- User state ----------------
@@ -401,6 +410,11 @@ async function logout() {
   await sb.auth.signOut();
   authUser = null;
   me = null;
+  // Shared computers: don't leave this student's AI chats on screen for the next person.
+  tutorLog.length = 0;
+  aiTest.log.length = 0;
+  aiTest.draft = [];
+  aiTest.types = [];
   $$(".modal").forEach(hide);
   history.replaceState(null, "", location.pathname);
   showAuthPanel("main");
@@ -847,6 +861,7 @@ function pageTopic(view, t) {
 
     <div id="tab-learn" class="stack">
       ${lessonHTML(t.id)}
+      ${explorerHTML(t.id)}
       ${t.example || t.diagram ? `
         <div class="card lesson">
           <h3>In real life</h3>
@@ -874,13 +889,14 @@ function pageTopic(view, t) {
     </div>
   `;
 
+  wireExplorer($("#tab-learn", view));
   $$("#diff button", view).forEach((b) => b.addEventListener("click", () => { difficulty = +b.dataset.d; newSet(); }));
 
   function showTab(name) {
     $$("#tabs button", view).forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
     $("#tab-learn", view).classList.toggle("hidden", name !== "learn");
     $("#tab-practice", view).classList.toggle("hidden", name !== "practice");
-    if (name === "practice") $("#qset input", view)?.focus();
+    if (name === "practice") $(FOCUS_SEL, $("#qset", view))?.focus({ preventScroll: true });
   }
   $$("#tabs button", view).forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
   $("#go-practice", view).addEventListener("click", () => { showTab("practice"); window.scrollTo(0, 0); });
@@ -892,18 +908,20 @@ function pageTopic(view, t) {
     $("#pts-each", view).textContent = set.length ? `+${pointsFor(set[0], t) * boosted} pts each${boosted > 1 ? ` (⚡ ${boosted}× event)` : ""}` : "";
 
     const form = $("#qset", view);
+    delete form.dataset.checked; // a fresh set can always be checked
     if (!set.length) { form.innerHTML = `<p class="muted">No questions at this level yet — try another.</p>`; return; }
     form.innerHTML = set.map((q, i) => questionHTML(q, i)).join("") +
       `<div class="row" style="margin-top:18px;">
         <button class="btn" type="submit" id="check">Check answers</button>
         <button class="btn secondary" type="button" id="skip-set">New set ↻</button>
       </div>`;
+    wireQuestions(form, set);
     $("#skip-set", form).addEventListener("click", () => {
-      const typed = $$("input", form).some((i) => i.value.trim());
+      const typed = $$(ANSWER_SEL, form).some((i) => i.value.trim());
       if (typed && !confirm("Get new questions? Your answers here won't be checked.")) return;
       newSet();
     });
-    if (!$("#tab-practice", view).classList.contains("hidden")) $("input", form)?.focus();
+    if (!$("#tab-practice", view).classList.contains("hidden")) $(FOCUS_SEL, form)?.focus({ preventScroll: true });
   }
 
   $("#qset", view).addEventListener("submit", (e) => {
@@ -967,6 +985,7 @@ function lessonHTML(topicId, { flat = false } = {}) {
       <h3>${esc(sec.title)}</h3>
       ${sec.text ? `<p>${esc(sec.text)}</p>` : ""}
       ${sec.points ? `<ul>${sec.points.map((pt) => `<li>${esc(pt)}</li>`).join("")}</ul>` : ""}
+      ${sec.visual ? visualHTML({ visual: sec.visual }) : ""}
       ${sec.tip ? `<div class="tip">💡 ${esc(sec.tip)}</div>` : ""}
     </div>`).join("");
 }
@@ -977,12 +996,22 @@ function questionHTML(q, i, topicLabel = "") {
       ${topicLabel ? `<div class="tag" style="display:inline-block; margin-bottom:6px;">${esc(topicLabel)}</div>` : ""}
       ${q.showPassage ? `<div class="passage">${esc(q.passage)}</div>` : ""}
       <div class="prompt"><span class="num">${i + 1}.</span>${esc(q.prompt)}</div>
-      ${q.answerType === "written" ? `<textarea data-qid="${q.id}" rows="3" placeholder="Write your answer in your own words"></textarea>`
+      ${isVisualInput(q) ? `<input type="hidden" data-qid="${q.id}" value="">${visualHTML(q)}`
+      : `${visualHTML(q)}${q.answerType === "written" ? `<textarea data-qid="${q.id}" rows="3" placeholder="Write your answer in your own words"></textarea>`
+      : q.answerType === "point" ? pointInputHTML(q)
       : q.options ? `<input type="hidden" data-qid="${q.id}" value="">
       <div class="mc">${q.options.map((o) => `<label class="mc-opt"><input type="radio" name="mc-${q.id}" value="${esc(o)}"> <span>${esc(o)}</span></label>`).join("")}</div>`
-      : `<input type="text" data-qid="${q.id}" placeholder="Your answer" inputmode="${q.answerType === "text" ? "text" : "decimal"}">`}
+      : `<input type="text" data-qid="${q.id}" placeholder="Your answer" inputmode="${q.answerType === "text" ? "text" : "decimal"}">`}`}
       <div class="q-feedback"></div>
     </div>`;
+}
+
+// Turns on tapping, plotting, dragging etc. for questions just rendered into `root`.
+function wireQuestions(root, qs) {
+  qs.forEach((q) => {
+    const row = $(`.question[data-qid="${CSS.escape(String(q.id))}"]`, root);
+    if (row) wireQuestion(row, q);
+  });
 }
 
 // Shows right/wrong, plus explanation and AI step-by-step buttons.
@@ -998,8 +1027,10 @@ function markQuestion(row, q, correct, { yourAnswer, feedback } = {}) {
       else if (radio.checked) label.classList.add("wrong");
     });
   }
+  const raw = yourAnswer !== undefined ? yourAnswer : $("input[type=hidden][data-qid]", row)?.value;
+  markVisual(row, q, raw, correct);
   const fb = $(".q-feedback", row);
-  const yours = yourAnswer !== undefined ? `You answered: ${esc(yourAnswer || "(blank)")}. ` : "";
+  const yours = yourAnswer !== undefined ? `You answered: ${esc(yourAnswerText(q, yourAnswer))}. ` : "";
   fb.innerHTML = `
     ${q.answerType === "written"
       ? `<div class="q-result ${correct ? "correct" : "wrong"}">${correct ? "✓ Good answer" : "✕ Not quite"}</div>
@@ -1022,7 +1053,7 @@ function markQuestion(row, q, correct, { yourAnswer, feedback } = {}) {
     try {
       box.textContent = await askTutor(`You are a friendly Year 7 tutor. Give a clear, numbered, step-by-step walkthrough for solving this question:
 "${q.prompt}"
-
+${q.visual ? `(The question shows: ${describeVisual(q.visual)}.)\n` : ""}
 The correct answer is: "${displayAnswer(q)}"
 
 Break the solution into short numbered steps a Year 7 student could follow easily. Keep it concise, no markdown formatting.`);
@@ -1785,19 +1816,44 @@ Tutor:`;
 }
 
 // ---------------- Test ----------------
+// ---------------- Test & study ----------------
+// Four ways in: a test from the question bank, plus three AI modes from js/study.js —
+// an AI-built test, flashcards, and info & ideas pages, each with a full chat.
+let testMode = "pick";
+const TEST_MODES = [
+  { id: "pick", icon: "🧩", name: "Pick topics", text: "A test from the question bank" },
+  { id: "chat", icon: "💬", name: "AI test", text: "Chat to build a test on anything" },
+  { id: "cards", icon: "🃏", name: "Flashcards", text: "Make cards and flip through them" },
+  { id: "info", icon: "💡", name: "Info & ideas", text: "Learn about any topic" },
+];
+let switchStudyMode = null; // set while the Test page is showing
+
 function pageTest(view) {
+  view.innerHTML = `
+    <div class="page-head"><h1>Test & study</h1><p>Build a test, chat with the AI, make flashcards, or get info and ideas on anything.</p></div>
+    <div class="mode-grid" id="t-mode" role="tablist">
+      ${TEST_MODES.map((m) => `<button type="button" role="tab" class="mode-btn" data-mode="${m.id}"><span class="mode-ico">${m.icon}</span><span class="mode-txt"><b>${m.name}</b><small>${m.text}</small></span></button>`).join("")}
+    </div>
+    <div id="mode-host"></div>`;
+  const host = $("#mode-host", view);
+  const openMode = (id) => {
+    testMode = id;
+    $$("#t-mode .mode-btn", view).forEach((b) => { const on = b.dataset.mode === id; b.classList.toggle("active", on); b.setAttribute("aria-selected", String(on)); });
+    host.innerHTML = "";
+    ({ pick: pickBuilder, chat: aiTestMode, cards: flashcardsMode, info: infoMode })[id](view, host);
+  };
+  switchStudyMode = openMode;
+  $$("#t-mode .mode-btn", view).forEach((b) => b.addEventListener("click", () => openMode(b.dataset.mode)));
+  openMode(TEST_MODES.some((m) => m.id === testMode) ? testMode : "pick");
+}
+
+// A test from the question bank (optionally rewritten by the AI from example questions).
+function pickBuilder(view, host) {
   const checklist = (topics) => topics.map((t) =>
     `<label class="chip-check"><input type="checkbox" value="${t.id}"> ${t.icon} ${esc(t.name)}</label>`).join("");
   const englishQuiz = ENGLISH_TOPICS.filter((t) => !t.special);
-
-  view.innerHTML = `
-    <div class="page-head"><h1>Test</h1><p>Build a test from any topics, or chat with the AI to plan one. Questions are marked when you submit.</p></div>
-    <div class="segmented" id="t-mode" style="margin-bottom:14px;">
-      <button type="button" data-mode="pick" class="${testMode === "pick" ? "active" : ""}">🧩 Pick topics</button>
-      <button type="button" data-mode="chat" class="${testMode === "chat" ? "active" : ""}">💬 Chat with AI</button>
-    </div>
-    <div class="card stack ${testMode === "chat" ? "" : "hidden"}" id="chat-builder"></div>
-    <div class="card stack ${testMode === "pick" ? "" : "hidden"}" id="builder">
+  host.innerHTML = `
+    <div class="card stack" id="builder">
       <div id="t-bank">
       <div>
         <div class="row between"><label class="field">Maths topics</label><button class="btn ghost sm" data-all="maths">Select all</button></div>
@@ -1825,44 +1881,33 @@ function pageTest(view) {
       <div class="grid" style="grid-template-columns: 1fr 1fr;">
         <div><label class="field" for="t-count">Questions</label><input type="number" id="t-count" min="1" max="50" value="10"></div>
         <div><label class="field" for="t-time">Time limit</label>
-          <select id="t-time">
-            <option value="0">No limit</option>
-            ${[5, 10, 15, 20, 30, 45, 60].map((m) => `<option value="${m}" ${m === 20 ? "selected" : ""}>${m} minutes</option>`).join("")}
-          </select>
+          <select id="t-time">${timeOptions(20)}</select>
         </div>
       </div>
       <div id="t-error" class="error hidden"></div>
       <button class="btn block" id="t-start">Start test →</button>
     </div>`;
 
-  $$("#t-mode button", view).forEach((b) => b.addEventListener("click", () => {
-    testMode = b.dataset.mode;
-    $$("#t-mode button", view).forEach((x) => x.classList.toggle("active", x === b));
-    $("#builder", view).classList.toggle("hidden", testMode !== "pick");
-    $("#chat-builder", view).classList.toggle("hidden", testMode !== "chat");
-  }));
-  testChatBuilder(view, $("#chat-builder", view));
-
-  $$("[data-all]", view).forEach((btn) => btn.addEventListener("click", () => {
-    const boxes = $$(`[data-group="${btn.dataset.all}"] input`, view);
+  $$("[data-all]", host).forEach((btn) => btn.addEventListener("click", () => {
+    const boxes = $$(`[data-group="${btn.dataset.all}"] input`, host);
     const allOn = boxes.every((b) => b.checked);
     boxes.forEach((b) => { b.checked = !allOn; });
     btn.textContent = allOn ? "Select all" : "Clear";
   }));
 
-  const examplesOnly = $("#t-examples-only", view);
+  const examplesOnly = $("#t-examples-only", host);
   examplesOnly.addEventListener("change", () => {
-    $("#t-bank", view).style.opacity = examplesOnly.checked ? ".4" : "";
-    $("#t-bank", view).style.pointerEvents = examplesOnly.checked ? "none" : "";
+    $("#t-bank", host).style.opacity = examplesOnly.checked ? ".4" : "";
+    $("#t-bank", host).style.pointerEvents = examplesOnly.checked ? "none" : "";
   });
 
-  $("#t-start", view).addEventListener("click", async () => {
-    const topicIds = $$("[data-group] input:checked", view).map((b) => b.value);
-    const diffs = $$("#t-diff input:checked", view).map((b) => +b.value);
-    const count = Math.max(1, Math.min(50, parseInt($("#t-count", view).value, 10) || 10));
-    const minutes = +$("#t-time", view).value;
-    const examples = $("#t-examples", view).value.trim();
-    const err = $("#t-error", view);
+  $("#t-start", host).addEventListener("click", async () => {
+    const topicIds = $$("[data-group] input:checked", host).map((b) => b.value);
+    const diffs = $$("#t-diff input:checked", host).map((b) => +b.value);
+    const count = Math.max(1, Math.min(50, parseInt($("#t-count", host).value, 10) || 10));
+    const minutes = +$("#t-time", host).value;
+    const examples = $("#t-examples", host).value.trim();
+    const err = $("#t-error", host);
     hide(err);
 
     if (examplesOnly.checked && !examples) return setMsg(err, "Type at least one example question.", "error");
@@ -1872,7 +1917,7 @@ function pageTest(view) {
     }
 
     if (examples) {
-      const btn = $("#t-start", view);
+      const btn = $("#t-start", host);
       btn.disabled = true;
       btn.textContent = "Writing your test…";
       try {
@@ -1898,13 +1943,37 @@ function pageTest(view) {
   });
 }
 
+const timeOptions = (selected) => `<option value="0"${selected === 0 ? " selected" : ""}>No limit</option>` +
+  [5, 10, 15, 20, 30, 45, 60].map((m) => `<option value="${m}"${m === selected ? " selected" : ""}>${m} minutes</option>`).join("");
+
+// How the AI should write test questions (used by the AI test chat and the example-based generator).
+const AI_QUESTION_RULES = `Question formats:
+- Short answer, fill in the blank, worded problems: ONE short, clearly correct answer (a number, word or short phrase), because answers are checked by exact match. Show a gap as "____".
+- Multiple choice, odd one out, spot the mistake: 4 choices in "options"; "answer" must be exactly one of them.
+- True or false: "options": ["True", "False"].
+- Explain in your own words: "type": "written"; "answer" is a short example answer (1–3 sentences). The AI marks these.
+- Reading passage: put the passage (80–200 words, or the student's own text) in "passage" on EVERY question about it, copied exactly.
+- Reading coordinates: "type": "point", "answer": "(3, -2)", plus a "plane" visual showing the point.
+
+Interactive and picture questions — use them where they suit the topic (especially maths, about a third of the questions) by adding "visual":
+- Plot points: {"type":"plot","targets":[[2,-3]]} (whole numbers from -6 to 6). The student taps the grid.
+- Place a number on a number line: {"type":"place","min":0,"max":1,"step":0.1,"target":0.7} (the target must sit on a step).
+- Shade part of a shape: {"type":"shade","shape":"bar","parts":8,"target":6} (shape: bar, circle or grid).
+- Make an angle with a protractor: {"type":"angleMake","target":135}.
+- Put things in order: {"type":"order","items":["smallest","middle","largest"],"first":"Smallest","last":"Largest"} — list the items in the CORRECT order; the site shuffles them.
+- Match pairs: {"type":"match","pairs":[["word","its meaning"],["word","its meaning"],["word","its meaning"]]} (3–5 pairs).
+- Tap words in a sentence: {"type":"tapword","text":"The dog *barked* loudly."} — put * around each correct word.
+For those, "answer" can be "".
+Diagrams shown above a typed or multiple-choice question: {"type":"plane","points":[{"x":3,"y":-2,"label":"A"}]}, {"type":"numberline","min":-5,"max":5,"step":1,"marks":[{"v":-3,"label":"A"}]}, {"type":"fraction","parts":5,"shaded":2}, {"type":"bars","labels":["Mon","Tue"],"values":[4,7],"title":"Rainy days"}, {"type":"spinner","sections":["red","blue","red"]}, {"type":"triangle","angles":["50°","60°","?"]}, {"type":"rect","w":8,"h":5,"unit":"cm"}, {"type":"circle","r":7,"unit":"cm"}, {"type":"angle","deg":120}, {"type":"table","rows":[["x",1,2,3],["y",3,5,"?"]]}.
+
+Each question: {"prompt":"...","options":[...],"type":"written or point","passage":"...","visual":{...},"answer":"...","explanation":"one short sentence","difficulty":1,"topicName":"Subject: topic"} — leave out keys that don't apply. difficulty: 1 easy, 2 medium, 3 hard. Make sure every fact and answer is correct.`;
+
 // Asks the tutor for new questions modelled on the student's examples.
 // With topics: stays within those topics/difficulties. Without: matches the examples' own subject and level.
 async function generateAIQuestions(examples, count, topics, diffs) {
-  const rules = `Each question must have ONE short, clearly correct answer (a word, number, phrase, or short mark/symbol) — not an open-ended or essay-style answer, since answers are checked by exact text match.
+  const rules = `${AI_QUESTION_RULES}
 
-Respond with ONLY a valid JSON array, no other text, no markdown code fences, in exactly this format:
-[{"prompt": "question text", "answer": "the answer", "explanation": "a one-sentence explanation of the answer", "difficulty": 1, "topicName": "the topic"}]`;
+Respond with ONLY a valid JSON array of question objects — no other text, no markdown code fences.`;
 
   const prompt = topics
     ? `You are writing exam questions for a Year 7 Australian curriculum test covering these topics: ${topics.map((t) => t.name).join(", ")}.
@@ -1915,7 +1984,7 @@ Here are example questions to match the style and structure of:
 ${examples}
 """
 
-Write exactly ${count} new original questions in that same style, spread across the topics listed above and matching the requested difficulty level(s). Set topicName to whichever listed topic each question belongs to, and difficulty to 1 for easy, 2 for medium, or 3 for hard.
+Write exactly ${count} new original questions in that same style, spread across the topics listed above and matching the requested difficulty level(s). Set topicName to whichever listed topic each question belongs to.
 
 ${rules}`
     : `You are writing exam questions based on example questions a student has given you:
@@ -1929,197 +1998,99 @@ Then write exactly ${count} new original questions on that same subject, at that
 
 ${rules}`;
 
-  return parseAIQuestions(await askTutor(prompt), count);
+  return parseAIQuestions(await askTutorRaw(prompt), count);
 }
 
-// Turns the AI's JSON reply into test questions. Multiple-choice / true-false
-// questions keep their options; the answer must be one of them.
-function parseAIQuestions(reply, count) {
-  const raw = reply.replace(/```json/gi, "").replace(/```/g, "");
-  const start = raw.indexOf("[");
-  const end = raw.lastIndexOf("]");
-  if (start === -1 || end < start) throw new Error("Unexpected AI response");
-  const stamp = Date.now();
-  let lastPassage = "";
-  return JSON.parse(raw.slice(start, end + 1))
-    .filter((q) => q && q.prompt && q.answer !== undefined && q.answer !== null && String(q.answer).trim() !== "")
-    .slice(0, count)
-    .map((q, i) => {
-      let answer = String(q.answer).trim();
-      let options = Array.isArray(q.options) ? [...new Set(q.options.map((o) => String(o).trim()).filter(Boolean))] : null;
-      if (options) {
-        const match = options.find((o) => o.toLowerCase() === answer.toLowerCase());
-        if (options.length >= 2 && match) {
-          answer = match;
-          if (options.length > 2) options = shuffle(options);
-        } else options = null;
-      }
-      const written = !options && String(q.type || "").toLowerCase() === "written";
-      const numeric = !options && !written && /^-?\d+(\.\d+)?$/.test(answer);
-      const passage = q.passage ? String(q.passage).trim() : "";
-      const showPassage = !!passage && passage !== lastPassage;
-      lastPassage = passage;
-      return {
-        id: `ai-${stamp}-${i}`,
-        prompt: String(q.prompt).trim(),
-        answer: numeric ? parseFloat(answer) : answer,
-        answerType: written ? "written" : numeric ? undefined : "text",
-        ...(options ? { options } : {}),
-        ...(passage ? { passage, showPassage } : {}),
-        explanation: q.explanation || "",
-        difficulty: [1, 2, 3].includes(Number(q.difficulty)) ? Number(q.difficulty) : 2,
-        topicName: String(q.topicName || "AI question"),
-      };
-    });
-}
-
-// ---------------- Test: chat with the AI ----------------
-let testMode = "pick";
-const testChatLog = []; // kept for the session so switching pages doesn't wipe the chat
-
-const QUESTION_TYPES = {
-  short: "Short answer",
-  mc: "Multiple choice",
-  tf: "True or false",
-  blank: "Fill in the blank",
-  worded: "Worded problems",
-  written: "Explain in your own words (AI-marked)",
-  passage: "Reading passage",
-  odd: "Odd one out",
-  mistake: "Spot the mistake",
-};
-
-function testChatBuilder(view, host) {
-  host.innerHTML = `
-    <p class="muted small" style="margin:0;">Tell the AI what you want to be tested on (any subject, like maths, English, science or history), what types of questions, and how hard. You can even paste in a text to be quizzed on. It'll help you plan, then press <b>Make my test</b>.</p>
-    <div class="chat" id="tc-chat" style="min-height:160px;"></div>
-    <form class="chat-form" id="tc-form" autocomplete="off">
-      <input type="text" id="tc-input" placeholder="e.g. Fractions and percentages, multiple choice, medium">
-      <button class="btn" type="submit" id="tc-send">Send</button>
-    </form>
-    <div>
-      <label class="field">Question types <span class="muted">(optional, or just tell the AI)</span></label>
-      <div class="checklist" id="tc-types">
-        ${Object.entries(QUESTION_TYPES).map(([k, v]) => `<label class="chip-check"><input type="checkbox" value="${k}"> ${v}</label>`).join("")}
-      </div>
-    </div>
-    <div class="grid" style="grid-template-columns: 1fr 1fr;">
-      <div><label class="field" for="tc-count">Questions</label><input type="number" id="tc-count" min="1" max="30" value="10"></div>
-      <div><label class="field" for="tc-time">Time limit</label>
-        <select id="tc-time">
-          <option value="0">No limit</option>
-          ${[5, 10, 15, 20, 30, 45, 60].map((m) => `<option value="${m}" ${m === 20 ? "selected" : ""}>${m} minutes</option>`).join("")}
-        </select>
-      </div>
-    </div>
-    <div id="tc-error" class="error hidden"></div>
-    <div class="row between">
-      <button class="btn ghost sm" type="button" id="tc-clear">Start over</button>
-      <button class="btn" type="button" id="tc-make">Make my test →</button>
-    </div>`;
-
-  const log = $("#tc-chat", host);
-  const input = $("#tc-input", host);
-  const sendBtn = $("#tc-send", host);
-  const err = $("#tc-error", host);
-  const types = () => $$("#tc-types input:checked", host).map((b) => QUESTION_TYPES[b.value]);
-  const history = () => testChatLog.filter((m) => m.role !== "err").slice(-12)
-    .map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.text}`).join("\n");
-
-  const draw = () => {
-    $("#tc-clear", host).classList.toggle("hidden", !testChatLog.length);
-    if (!testChatLog.length) {
-      const ideas = ["Test me on fractions and decimals, multiple choice", "Science quiz on the solar system", "Write a reading passage and ask me questions on it", "History: ancient Egypt, mix of question types", "Spot the mistake in grammar sentences", "I'm not sure, what should I practise?"];
-      log.innerHTML = `<div class="chat-empty small">What do you want your test to be about?
-        <div class="chips">${ideas.map((x) => `<button type="button" class="btn secondary sm">${esc(x)}</button>`).join("")}</div></div>`;
-      $$(".chips button", log).forEach((b) => b.addEventListener("click", () => send(b.textContent)));
-      return;
+// Reads JSON out of an AI reply: ignores text and code fences around it, and repairs a reply that was cut off
+// (keeping every complete item). Returns null when there's no usable JSON.
+function parseLooseJSON(text) {
+  const s = String(text || "").replace(/```(?:json)?/gi, "");
+  const start = s.search(/[[{]/);
+  if (start < 0) return null;
+  const body = s.slice(start);
+  const stack = [];
+  let inStr = false, escaped = false, lastSafe = -1, safeStack = null;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (inStr) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inStr = false;
+      continue;
     }
-    log.innerHTML = testChatLog.map((m) => `<div class="bubble ${m.role}">${esc(m.text)}</div>`).join("");
-    log.scrollTop = log.scrollHeight;
-  };
-
-  async function send(text) {
-    text = text.trim();
-    if (!text) return;
-    hide(err);
-    const before = history();
-    testChatLog.push({ role: "me", text });
-    const pending = { role: "bot", text: "Thinking…" };
-    testChatLog.push(pending);
-    input.value = "";
-    sendBtn.disabled = true;
-    draw();
-    const picked = types();
-    const topicList = [...MATHS_TOPICS, ...ENGLISH_TOPICS.filter((t) => !t.special)].map((t) => t.name).join(", ");
-    try {
-      pending.text = await askTutor(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student plan a practice test. The test can be on ANY school subject or topic they like: maths, English, science, history, geography, health, languages, digital technologies, general knowledge, or something they're interested in (keep it school-appropriate). Find out what they want: which topics, what types of questions and how hard (easy, medium or hard). Question types you can offer: short answer, multiple choice, true or false, fill in the blank, worded problems, explain in your own words (the AI marks these), questions about a reading passage (you write one, or they paste their own text into the chat), odd one out, spot the mistake, and any other special style they ask for, as long as each question can be answered in a word, a short phrase, by picking an option, or in a few sentences. If they're unsure, suggest something sensible. Ask at most one or two short questions at a time. Once you know enough, sum up the test plan in a few short lines and tell them to press "Make my test" when they're ready. The number of questions (${$("#tc-count", host).value}) and the time limit are set with the boxes under the chat, so don't ask about those. You only plan the test: do NOT write the test questions in the chat. Keep replies under 90 words, warm and clear, with no markdown formatting.
-
-Topics already on the site: ${topicList}. The student can ask for any other subject or topic too.
-${picked.length ? `They've ticked these question types: ${picked.join(", ")}.\n` : ""}
-${before ? `Conversation so far:\n${before}\n` : ""}Student: ${text}
-Tutor:`);
-    } catch (e) {
-      console.error(e);
-      pending.role = "err";
-      pending.text = "Sorry, I couldn't reach the AI. Please try again in a moment.";
+    if (ch === '"') inStr = true;
+    else if (ch === "{" || ch === "[") stack.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") {
+      stack.pop();
+      if (!stack.length) { try { return JSON.parse(body.slice(0, i + 1)); } catch (e) { return null; } }
+      lastSafe = i;
+      safeStack = [...stack];
     }
-    if (!document.body.contains(log)) return;
-    draw();
-    sendBtn.disabled = false;
-    input.focus();
   }
+  if (lastSafe < 0) return null;
+  try { return JSON.parse(body.slice(0, lastSafe + 1) + safeStack.reverse().join("")); } catch (e) { return null; }
+}
 
-  $("#tc-form", host).addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
-  $("#tc-clear", host).addEventListener("click", () => {
-    testChatLog.length = 0;
-    hide(err);
-    draw();
-  });
-
-  $("#tc-make", host).addEventListener("click", async () => {
-    hide(err);
-    const typed = input.value.trim();
-    if (!testChatLog.some((m) => m.role === "me") && !typed) return setMsg(err, "Tell the AI what you want your test to be about first.", "error");
-    const count = Math.max(1, Math.min(30, parseInt($("#tc-count", host).value, 10) || 10));
-    const minutes = +$("#tc-time", host).value;
-    const btn = $("#tc-make", host);
-    btn.disabled = true;
-    btn.textContent = "Writing your test…";
-    const picked = types();
-    try {
-      const qs = parseAIQuestions(await askTutor(`You are writing a practice test for a Year 7 student (Victorian Curriculum, Australia). Here is the student's chat with a tutor about what they want on the test:
-"""
-${history()}${typed ? `\nStudent: ${typed}` : ""}
-"""
-${picked.length ? `Use ONLY these question types: ${picked.join(", ")}.\n` : "Use the question types the student asked for. If they didn't say, mix short answer and multiple choice.\n"}
-Write exactly ${count} new original questions covering the subjects, topics, question types and difficulty the student asked for (any school subject is fine). Pitch them at a Year 7 level unless the student asked for easier or harder. Make sure every fact and answer is correct.
-
-Question type rules:
-- Short answer, fill in the blank and worded problems: ONE short, clearly correct answer (a number, word or short phrase), since answers are checked by exact text match. For fill in the blank, show the gap as "____" in the question.
-- Multiple choice, odd one out and spot the mistake: give 4 options in "options", and "answer" must be exactly one of them.
-- True or false: "options" must be ["True", "False"] and "answer" one of them.
-- Explain in your own words: set "type" to "written". "answer" is a short example answer (1-3 sentences). The AI marks these later.
-- Reading passage: put the passage (80-200 words, or the student's own text if they pasted one) in "passage" on EVERY question about it, copied exactly the same each time.
-- Any other special style the student asked for: fit it into one of the formats above.
-
-Respond with ONLY a valid JSON array, no other text, no markdown code fences, in exactly this format:
-[{"prompt": "question text", "options": ["only for multiple choice, odd one out, spot the mistake or true/false"], "type": "only \"written\" for explain-in-your-own-words", "passage": "only for reading passage questions", "answer": "the answer", "explanation": "a one-sentence explanation of the answer", "difficulty": 1, "topicName": "the subject and topic, e.g. Science: Cells"}]
-Leave out "options", "type" and "passage" when they don't apply. difficulty is 1 for easy, 2 for medium, 3 for hard.`), count);
-      if (!qs.length) throw new Error("No usable questions");
-      runTest(view, qs.map((q) => ({ q, topic: { id: null, name: q.topicName, icon: "🤖" } })), minutes);
-    } catch (e) {
-      console.error("Apex: AI chat test failed —", e);
-      btn.disabled = false;
-      btn.textContent = "Make my test →";
-      setMsg(err, "Couldn't write the test. Try telling the AI a bit more, then press Make my test again.", "error");
+// Turns question objects written by the AI into test questions, dropping any that aren't usable.
+function normaliseAIQuestions(list, count = 50) {
+  const stamp = Date.now().toString(36);
+  let lastPassage = "";
+  return (Array.isArray(list) ? list : []).filter((q) => q && typeof q === "object" && q.prompt).slice(0, count).map((q, i) => {
+    const out = {
+      id: `ai-${stamp}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+      prompt: String(q.prompt).trim().slice(0, 800),
+      explanation: String(q.explanation || "").slice(0, 500),
+      difficulty: [1, 2, 3].includes(Number(q.difficulty)) ? Number(q.difficulty) : 2,
+      topicName: String(q.topicName || "AI question").slice(0, 60),
+    };
+    const passage = q.passage ? String(q.passage).trim().slice(0, 3000) : "";
+    if (passage) { out.passage = passage; out.showPassage = passage !== lastPassage; }
+    lastPassage = passage;
+    if (q.visual) {
+      const v = cleanVisual(q.visual);
+      if (!v) return null; // the question needs its picture
+      out.visual = v;
+      if (isVisualInput(out)) { out.answer = visualAnswerText(out); return out; }
     }
-  });
+    const type = String(q.type || "").toLowerCase();
+    let answer = q.answer === undefined || q.answer === null ? "" : String(q.answer).trim();
+    if (type === "point") {
+      const m = answer.replace(/[−–]/g, "-").match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
+      if (!m) return null;
+      out.answerType = "point";
+      out.point = [Number(m[1]), Number(m[2])];
+      out.answer = `(${m[1]}, ${m[2]})`.replace(/-/g, "−");
+      return out;
+    }
+    if (!answer) return null;
+    let options = Array.isArray(q.options) ? [...new Set(q.options.map((o) => String(o).trim()).filter(Boolean))].slice(0, 6) : null;
+    if (options) {
+      const match = options.find((o) => o.toLowerCase() === answer.toLowerCase());
+      if (options.length >= 2 && match) {
+        answer = match;
+        if (options.length > 2) options = shuffle(options);
+      } else options = null;
+    }
+    const written = !options && type === "written";
+    const numeric = !options && !written && /^-?\d+(\.\d+)?$/.test(answer);
+    out.answer = numeric ? parseFloat(answer) : answer;
+    out.answerType = written ? "written" : numeric ? undefined : "text";
+    if (options) out.options = options;
+    return out;
+  }).filter(Boolean);
+}
 
-  draw();
+// The AI's reply as test questions (a JSON array, or an object with "questions"/"add").
+function parseAIQuestions(reply, count) {
+  const data = parseLooseJSON(reply);
+  const list = Array.isArray(data) ? data : data?.questions || data?.add || [];
+  if (!list.length) throw new Error("Unexpected AI response");
+  return normaliseAIQuestions(list, count);
 }
 
 const ANSWER_SEL = "input[data-qid], textarea[data-qid]";
+// The first box a student can type in (skips hidden answer fields and tap-to-answer questions).
+const FOCUS_SEL = "input[type=text], textarea";
 
 // Asks the AI to mark "explain in your own words" answers. Returns { [index]: { correct, feedback } }.
 async function markWrittenAnswers(list) {
@@ -2129,7 +2100,7 @@ async function markWrittenAnswers(list) {
   const todo = list.filter((w) => w.answer.trim());
   if (!todo.length) return out;
   try {
-    const reply = await askTutor(`You are a fair, encouraging Year 7 teacher marking short written answers. For each one, decide if the student's answer is correct: it shows the key idea of the example answer, even if worded differently or with small spelling mistakes. Then give one or two short sentences of feedback written to the student.
+    const reply = await askTutorRaw(`You are a fair, encouraging Year 7 teacher marking short written answers. For each one, decide if the student's answer is correct: it shows the key idea of the example answer, even if worded differently or with small spelling mistakes. Then give one or two short sentences of feedback written to the student.
 
 ${todo.map((w, n) => `Answer ${n + 1}
 Question: ${w.q.prompt}${w.q.passage ? `\nPassage: ${w.q.passage}` : ""}
@@ -2138,8 +2109,8 @@ Student's answer: ${w.answer}`).join("\n\n")}
 
 Respond with ONLY a valid JSON array with one item per answer, in order, no other text:
 [{"correct": true, "feedback": "..."}]`);
-    const raw = reply.replace(/```json/gi, "").replace(/```/g, "");
-    const marks = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+    const marks = parseLooseJSON(reply);
+    if (!Array.isArray(marks)) throw new Error("Unexpected AI response");
     todo.forEach((w, n) => {
       const m = marks[n] || {};
       out[w.i] = { correct: m.correct === true || m.correct === "true", feedback: String(m.feedback || "") };
@@ -2151,7 +2122,8 @@ Respond with ONLY a valid JSON array with one item per answer, in order, no othe
   return out;
 }
 
-function runTest(view, items, minutes) {
+// opts.noPoints: practice only (e.g. a quiz from your own flashcards). opts.again: label for the button after.
+function runTest(view, items, minutes, opts = {}) {
   let secondsLeft = minutes * 60;
   let timer = null;
   leaveWarning = "Leave the test? Your answers won't be saved.";
@@ -2175,11 +2147,7 @@ function runTest(view, items, minutes) {
     $("#answered", view).textContent = `${n} of ${items.length} answered`;
   };
   drawAnswered();
-  form.addEventListener("change", (e) => {
-    if (e.target.type !== "radio") return;
-    $("input[data-qid]", e.target.closest(".question")).value = e.target.value;
-    drawAnswered();
-  });
+  wireQuestions(form, items.map(({ q }) => q));
   form.addEventListener("input", drawAnswered);
 
   const clock = $("#t-clock", view);
@@ -2196,7 +2164,7 @@ function runTest(view, items, minutes) {
     }, 1000);
   }
   cleanup = () => clearInterval(timer);
-  $("input:not([type=hidden])", form)?.focus();
+  $(FOCUS_SEL, form)?.focus({ preventScroll: true });
   $("#t-quit", view).addEventListener("click", () => {
     if (confirm(leaveWarning)) route(); // route() clears the timer and warning
   });
@@ -2227,7 +2195,7 @@ function runTest(view, items, minutes) {
     const results = items.map(({ q, topic }, i) => ({ q, topic,
       correct: q.answerType === "written" ? !!feedback[i]?.correct : isAnswerCorrect(q, answers[i]) }));
     const right = results.filter((r) => r.correct).length;
-    const earned = recordResults(results, { isTest: true });
+    const earned = opts.noPoints ? 0 : recordResults(results, { isTest: true });
     const pct = Math.round((right / items.length) * 100);
 
     view.innerHTML = `
@@ -2235,12 +2203,12 @@ function runTest(view, items, minutes) {
       <div class="grid cols-3" style="margin-bottom:16px;">
         ${statCard("Score", `${right}/${items.length}`)}
         ${statCard("Percent", pct + "%")}
-        ${statCard("Points" + (earned ? boostNote(true) : ""), "+" + earned)}
+        ${opts.noPoints ? statCard("Points", `<span class="muted small" style="font-size:15px;">Practice only</span>`) : statCard("Points" + (earned ? boostNote(true) : ""), "+" + earned)}
       </div>
       <div class="card" id="review">
         ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name)).join("")}
       </div>
-      <div class="row" style="margin-top:16px;"><a class="btn" href="#/test" id="again">Build another test</a></div>`;
+      <div class="row" style="margin-top:16px;"><a class="btn" href="#/test" id="again">${esc(opts.again || "Build another test")}</a></div>`;
 
     items.forEach(({ q }, i) => {
       const row = $(`.question[data-qid="${q.id}"]`, view);
