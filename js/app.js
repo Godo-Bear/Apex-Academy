@@ -537,10 +537,10 @@ function watchForUpdates() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-06a";
+const TERMS_VERSION = "2026-10-08a";
 const TERMS_CHANGES = [
-  "Price drop: access is now $10 AUD every 6 months (was $15), paid cash in hand to the site owner.",
-  "Apex Academy now covers science as well as maths and English.",
+  "New — public tests: you can share tests with everyone on Apex Academy. Shared tests show your name (unless you turn it off), must follow the behaviour rules, and can be removed by the site owner.",
+  "Access is $10 AUD every 6 months, paid cash in hand to the site owner.",
   "Accounts are unlocked by hand, so it may take a while after paying. No refunds.",
   "Using the AI: it's for learning. Don't hand in AI-written work as your own.",
   "Behaviour: be respectful, or your account may be suspended.",
@@ -728,7 +728,7 @@ function route() {
   leaveWarning = null;
   flushPendingAnnouncement();
   lastHash = location.hash;
-  const [page = "home", arg] = location.hash.replace(/^#\/?/, "").split("/");
+  const [page = "home", arg, arg2] = location.hash.replace(/^#\/?/, "").split("/");
   const view = $("#view");
   const pages = { home: pageHome, practice: pagePractice, test: pageTest, tutor: pageTutor, progress: pageProgress, notes: pageNotes, admin: pageAdmin, settings: pageSettings };
   const render = pages[page] || pageHome;
@@ -736,7 +736,7 @@ function route() {
   $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === navRoute));
   view.innerHTML = "";
   view.closest("main").classList.remove("with-notes");
-  render(view, arg);
+  render(view, arg, arg2);
   window.scrollTo(0, 0);
 }
 
@@ -1885,10 +1885,13 @@ const TEST_MODES = [
   { id: "chat", icon: "💬", name: "AI test" },
   { id: "cards", icon: "🃏", name: "Flashcards" },
   { id: "info", icon: "💡", name: "Info & ideas" },
+  { id: "public", icon: "🌍", name: "Public tests" },
 ];
 let switchStudyMode = null; // set while the Test page is showing
 
-function pageTest(view) {
+// #/test/public/<id> opens Public tests with that test at the top (for shared links).
+function pageTest(view, arg, focusId) {
+  if (arg === "public") testMode = "public";
   view.innerHTML = `
     <div class="page-head"><h1>Test & study</h1><p>Build a test, chat with the AI, make flashcards, or get info and ideas on anything.</p></div>
     <div class="mode-grid" id="t-mode" role="tablist">
@@ -1900,7 +1903,7 @@ function pageTest(view) {
     testMode = id;
     $$("#t-mode .mode-btn", view).forEach((b) => { const on = b.dataset.mode === id; b.classList.toggle("active", on); b.setAttribute("aria-selected", String(on)); });
     host.innerHTML = "";
-    ({ pick: pickBuilder, chat: aiTestMode, cards: flashcardsMode, info: infoMode })[id](view, host);
+    ({ pick: pickBuilder, chat: aiTestMode, cards: flashcardsMode, info: infoMode, public: (v, h) => publicTestsMode(v, h, focusId) })[id](view, host);
   };
   switchStudyMode = openMode;
   $$("#t-mode .mode-btn", view).forEach((b) => b.addEventListener("click", () => openMode(b.dataset.mode)));
@@ -2282,7 +2285,8 @@ function runTest(view, items, minutes, opts = {}) {
       <div class="card" id="review">
         ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name, shown[i])).join("")}
       </div>
-      <div class="row" style="margin-top:16px;"><a class="btn" href="#/test" id="again">${esc(opts.again || "Build another test")}</a></div>`;
+      <div class="row" style="margin-top:16px;"><a class="btn" href="#/test" id="again">${esc(opts.again || "Build another test")}</a>
+        ${opts.noPoints || opts.publicId ? "" : `<button class="btn secondary" type="button" id="share-test">🌍 Share this test</button>`}</div>`;
 
     items.forEach(({ q }, i) => {
       const row = $(`.question[data-qid="${q.id}"]`, view);
@@ -2291,6 +2295,7 @@ function runTest(view, items, minutes, opts = {}) {
     });
     // Already on #/test, so re-render the builder directly.
     $("#again", view).addEventListener("click", (e) => { e.preventDefault(); route(); });
+    $("#share-test", view)?.addEventListener("click", () => openShareTest(items, { minutes }));
     window.scrollTo(0, 0);
   }
 }

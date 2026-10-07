@@ -179,12 +179,14 @@ Reply with ONLY valid JSON, no markdown:
         : `<p class="muted small" style="margin:0;">No questions yet. Ask the AI for some — e.g. “Give me 10 questions on fractions”.</p>`}
       <div class="draft-start">
         <div><label class="field" for="tc-time">Time limit</label><select id="tc-time">${timeOptions(aiTest.minutes)}</select></div>
+        <button class="btn secondary" id="tc-share" type="button"${qs.length ? "" : " disabled"}>🌍 Share</button>
         <button class="btn" id="tc-start" type="button"${qs.length ? "" : " disabled"}>Start test →</button>
       </div>
       ${aiTest.log.length || qs.length ? `<button class="btn ghost sm" id="tc-reset" type="button" style="justify-self:start;">Start over (clear the chat and test)</button>` : ""}`;
     $$("[data-x]", d).forEach((b) => b.addEventListener("click", () => { aiTest.draft.splice(+b.dataset.x, 1); drawDraft(); }));
     $("#tc-clear", d)?.addEventListener("click", () => { if (confirm("Remove all the questions from this test?")) { aiTest.draft = []; drawDraft(); } });
     $("#tc-time", d).addEventListener("change", (e) => { aiTest.minutes = +e.target.value; });
+    $("#tc-share", d).addEventListener("click", () => openShareTest(aiTest.draft.map((q) => ({ q, topic: { id: null, name: q.topicName } })), { minutes: aiTest.minutes, title: aiTest.draft[0]?.topicName || "" }));
     $("#tc-reset", d)?.addEventListener("click", () => {
       if (!confirm("Clear the chat and the test, and start again?")) return;
       aiTest.log.length = 0;
