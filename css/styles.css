@@ -187,7 +187,7 @@ label.field { display: block; font-size: 13px; font-weight: 600; margin-bottom: 
 .me-box { padding: 8px 12px 12px; font-size: 13px; }
 .me-box strong { display: block; font-size: 14px; }
 
-main { padding: 32px clamp(16px, 4vw, 48px) 96px; max-width: 980px; width: 100%; }
+main { padding: 32px clamp(16px, 4vw, 48px) 96px; max-width: 980px; width: 100%; min-width: 0; }
 .page-head { margin-bottom: 20px; }
 .page-head p { color: var(--muted); margin: 0; }
 .back { display: inline-block; margin-bottom: 12px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; }

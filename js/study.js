@@ -80,7 +80,8 @@ function takePendingAction(mode) {
 }
 
 // ---------------------------------------------------------------- AI test
-const aiTest = { log: [], draft: [], minutes: 20, types: [], files: [] }; // kept for this visit to the site
+const aiTest = { log: [], draft: [], minutes: 20, types: [], files: [] };
+const studyFiles = { cards: [], info: [] }; // files added to the flashcards and info chats (kept for this visit) // kept for this visit to the site
 const AI_TEST_TYPES = {
   short: "Short answer", mc: "Multiple choice", tf: "True or false", blank: "Fill in the blank", worded: "Worded problems",
   written: "Explain in your own words (AI-marked)", passage: "Reading passage", visual: "Interactive (plot, shade, order, match, tap…)",
@@ -214,7 +215,52 @@ Reply with ONLY valid JSON, no markdown:
 const decksKey = () => `apex-decks-${authUser.id}`;
 function loadDecks() {
   const d = store(decksKey());
-  return d && Array.isArray(d.decks) ? { decks: d.decks, current: d.current, chat: Array.isArray(d.chat) ? d.chat : [] } : { decks: [], current: null, chat: [] };
+  return d && Array.isArray(d.decks)
+    ? { decks: d.decks, current: d.current, chat: Array.isArray(d.chat) ? d.chat : [], deleted: Array.isArray(d.deleted) ? d.deleted : [] }
+    : { decks: [], current: null, chat: [], deleted: [] };
+}
+
+// Decks are also saved to the student's account (the "flashcards" table, supabase/flashcards.sql),
+// so they show up on every device. Works on this device only if the table isn't there.
+let cloudDecks = true, pushTimer = null;
+const isBlankDeck = (d) => !d.cards.length && d.name === "New deck";
+function pushDecks(state) {
+  if (!cloudDecks) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    try {
+      const { error } = await sb.from("flashcards").upsert({
+        user_id: authUser.id, updated_at: new Date().toISOString(),
+        data: { decks: state.decks.filter((d) => !isBlankDeck(d)), deleted: state.deleted.slice(-200) },
+      });
+      if (error) throw error;
+    } catch (e) { cloudDecks = false; console.warn("Apex: flashcards table unavailable, saving on this device only —", e.message || e); }
+  }, 700);
+}
+// Brings in decks saved from other devices. The newer copy of each deck wins; deleted decks stay deleted.
+async function pullDecks(state) {
+  if (!cloudDecks) return false;
+  let row;
+  try {
+    const { data, error } = await sb.from("flashcards").select("data").eq("user_id", authUser.id).maybeSingle();
+    if (error) throw error;
+    row = data?.data;
+  } catch (e) { cloudDecks = false; return false; }
+  if (!row || !Array.isArray(row.decks)) return false;
+  const deleted = [...new Set([...state.deleted, ...(row.deleted || [])])];
+  const byId = new Map(state.decks.map((d) => [d.id, d]));
+  let changed = deleted.length !== state.deleted.length;
+  row.decks.forEach((d) => {
+    if (!d || !d.id || !Array.isArray(d.cards)) return;
+    const mine = byId.get(d.id);
+    if (!mine) { byId.set(d.id, d); changed = true; } else if ((d.updated || 0) > (mine.updated || 0)) { byId.set(d.id, d); changed = true; }
+  });
+  const decks = [...byId.values()].filter((d) => !deleted.includes(d.id));
+  // Drop an empty starter deck once real decks have arrived.
+  const real = decks.filter((d) => !isBlankDeck(d));
+  state.decks = real.length ? real : decks;
+  state.deleted = deleted.slice(-200);
+  return changed;
 }
 const newDeck = (name = "New deck") => ({ id: uid("d"), name, cards: [], updated: Date.now() });
 const fcView = { deckId: null, order: [], i: 0, onlyLearning: false }; // where you are in the deck
@@ -230,15 +276,19 @@ function flashcardsMode(view, host) {
     state.decks = state.decks.slice(-40);
     state.chat = state.chat.slice(-30);
     store(decksKey(), state);
+    pushDecks(state);
   };
-  save();
+  store(decksKey(), state);
 
   host.innerHTML = `
     <div class="stack">
-      <div class="card stack"><h3 style="margin:0;">💬 Ask the AI</h3><div id="fc-chat"></div></div>
+      <div class="card stack"><h3 style="margin:0;">💬 Ask the AI</h3>
+        <div id="fc-files">${uploadBoxHTML("e.g. “Make flashcards from my notes”.")}</div>
+        <div id="fc-chat"></div></div>
       <div class="stack" id="fc-main"></div>
     </div>`;
   const main = $("#fc-main", host);
+  wireUploadBox($("#fc-files", host), studyFiles.cards);
 
   const studyOrder = () => deck.cards.map((c, i) => i).filter((i) => !fcView.onlyLearning || !deck.cards[i].known);
   const resetView = (keepPlace) => {
@@ -364,6 +414,7 @@ function flashcardsMode(view, host) {
     $("#fc-del", main).addEventListener("click", () => {
       if (!confirm(`Delete the deck "${deck.name}" and its ${deck.cards.length} cards?`)) return;
       state.decks = state.decks.filter((d) => d !== deck);
+      state.deleted.push(deck.id);
       deck = state.decks[state.decks.length - 1] || newDeck();
       if (!state.decks.includes(deck)) state.decks.push(deck);
       state.current = deck.id;
@@ -471,7 +522,8 @@ function flashcardsMode(view, host) {
     async onSend(text, hidden) {
       const history = chatHistory(state.chat.slice(0, -2));
       const listCards = deck.cards.slice(0, 60).map((c, i) => `${i + 1}. ${c.f.slice(0, 90)} → ${c.b.slice(0, 90)}`).join("\n");
-      const raw = await askTutorRaw(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student make and study flashcards, in a chat. Flashcards can be on ANY school subject or topic.
+      if (studyFiles.cards.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
+      const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student make and study flashcards, in a chat. Flashcards can be on ANY school subject or topic.
 
 ${deck.cards.length ? `The current deck "${deck.name}" has ${deck.cards.length} cards:\n${listCards}` : `The current deck${deck.name !== "New deck" ? ` ("${deck.name}")` : ""} is empty.`}
 
@@ -486,7 +538,8 @@ What to do:
 ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}${hidden ? `\n\n(Extra information for you, from the student's info page:\n${hidden})` : ""}
 
 Reply with ONLY valid JSON, no markdown:
-{"reply":"a short friendly message (under 50 words)","newDeck":false,"name":"","add":[{"front":"...","back":"..."}],"remove":[card numbers]}`);
+{"reply":"a short friendly message (under 50 words)","newDeck":false,"name":"","add":[{"front":"...","back":"..."}],"remove":[card numbers]}`, studyFiles.cards,
+        "The student uploaded files for their flashcards. Unless they ask for something else, make the cards from the key words, facts and ideas in this material (in your own short words)."));
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
       const incoming = (Array.isArray(data) ? data : obj.add || obj.cards || [])
@@ -516,6 +569,15 @@ Reply with ONLY valid JSON, no markdown:
   });
 
   draw();
+  pullDecks(state).then((changed) => {
+    if (!changed || !document.body.contains(main)) return;
+    deck = state.decks.find((d) => d.id === state.current) || state.decks.find((d) => d.id === deck.id) || state.decks[state.decks.length - 1] || newDeck();
+    if (!state.decks.includes(deck)) state.decks.push(deck);
+    state.current = deck.id;
+    store(decksKey(), state);
+    resetView(true);
+    draw();
+  });
   const action = takePendingAction("cards");
   if (action) chat.send(action.text, action.hidden);
 }
@@ -561,9 +623,12 @@ function infoMode(view, host) {
   host.innerHTML = `
     <div class="study-grid">
       <div class="card stack" id="in-main"></div>
-      <div class="card stack study-side"><h3 style="margin:0;">💬 Ask the AI</h3><div id="in-chat"></div></div>
+      <div class="card stack study-side"><h3 style="margin:0;">💬 Ask the AI</h3>
+        <div id="in-files">${uploadBoxHTML("e.g. “Summarise my file”.")}</div>
+        <div id="in-chat"></div></div>
     </div>`;
   const main = $("#in-main", host);
+  wireUploadBox($("#in-files", host), studyFiles.info);
 
   function draw() {
     const head = state.pages.length ? `
@@ -663,7 +728,8 @@ function infoMode(view, host) {
     async onSend(text) {
       const history = chatHistory(state.chat.slice(0, -2));
       const current = page ? `The student's current page is "${page.title}", with these sections: ${page.sections.map((s) => s.heading).join("; ")}.` : "There's no page yet.";
-      const raw = await askTutorRaw(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) making an interactive info page WITH a student, in a chat. It can be about ANY school-appropriate subject or topic: facts about something, how something works, a summary of a school topic, or ideas (for a project, story, essay, experiment or presentation).
+      if (studyFiles.info.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
+      const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) making an interactive info page WITH a student, in a chat. It can be about ANY school-appropriate subject or topic: facts about something, how something works, a summary of a school topic, or ideas (for a project, story, essay, experiment or presentation).
 
 ${current}
 
@@ -677,7 +743,8 @@ What to do:
 ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}
 
 Reply with ONLY valid JSON, no markdown:
-{"reply":"a short message (under 50 words)","mode":"new","page":{"title":"...","intro":"1–2 sentences","sections":[{"heading":"...","points":["..."]}],"terms":[{"term":"...","meaning":"..."}],"facts":["..."],"quiz":[{"q":"...","options":["...","...","...","..."],"answer":"..."}]}}`);
+{"reply":"a short message (under 50 words)","mode":"new","page":{"title":"...","intro":"1–2 sentences","sections":[{"heading":"...","points":["..."]}],"terms":[{"term":"...","meaning":"..."}],"facts":["..."],"quiz":[{"q":"...","options":["...","...","...","..."],"answer":"..."}]}}`, studyFiles.info,
+        "The student uploaded files. Use this material for the page: summarise it, explain it, or answer their questions about it, as they ask."));
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
       let note = "";
