@@ -1,7 +1,7 @@
 /* Question bank upgrades. Runs after data.js and visuals.js, before app.js.
    1. Questions that list their choices ("Enter 'a' or 'b'", "Which is larger: 0.7 or 0.65?") become tap-to-answer.
    2. Diagrams on existing questions (shapes, angles, spinners, number lines…).
-   3. New interactive questions for every maths and English topic (plot, place, shade, turn, order, match, tap).
+   3. New interactive questions for every maths and English topic (plot, place, shade, turn, order, match, tap, sort), so every topic has at least 15 questions per level.
    4. A new topic: The Cartesian Plane. */
 (function () {
   "use strict";
@@ -435,6 +435,151 @@
     { d: 2, prompt: "Tap the two words that are personification.", visual: { type: "tapword", text: "The old house *groaned* and *sighed* in the wind." }, explanation: "Houses can't really groan or sigh — these are human actions." },
     { d: 3, prompt: "Match each idiom to its meaning.", visual: { type: "match", pairs: [["Break a leg", "Good luck"], ["A piece of cake", "Very easy"], ["Spill the beans", "Reveal a secret"], ["Under the weather", "Feeling sick"]] }, explanation: "Idioms mean something different from their literal words." },
     { d: 3, prompt: "Match each example to its technique.", visual: { type: "match", pairs: [["deafening silence", "oxymoron"], ["as quiet as a mouse", "simile"], ["Her eyes were diamonds", "metaphor"], ["sizzle", "onomatopoeia"]] }, explanation: "An oxymoron joins opposites; a simile uses as/like; a metaphor says something is something else; sizzle copies a sound." },
+  ]);
+
+
+  // More English questions, so every topic has 15 at each level.
+  const mixed = (arr, seed) => {
+    let x = [...seed].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const rnd = () => { x = (x + 0x6d2b79f5) >>> 0; let t = Math.imul(x ^ (x >>> 15), 1 | x); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const out = [...arr];
+    for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+    return out;
+  };
+  const mc = (d, prompt, options, answer, explanation, extra = {}) => ({ d, prompt, options: mixed(options, prompt + (extra.passage || "")), answer, explanation, ...extra });
+  const typed = (d, prompt, answer, explanation, extra = {}) => ({ d, prompt, answer, answerType: "text", explanation, ...extra });
+  const tw = (d, prompt, text, explanation, extra = {}) => ({ d, prompt, visual: { type: "tapword", text }, explanation, ...extra });
+  const mt = (d, prompt, pairs, explanation) => ({ d, prompt, visual: { type: "match", pairs }, explanation });
+  const od = (d, prompt, items, first, last, explanation, extra = {}) => ({ d, prompt, visual: { type: "order", items, first, last }, explanation, ...extra });
+  const st = (d, prompt, cats, items, explanation, extra = {}) => ({ d, prompt, visual: { type: "sort", cats, items }, explanation, ...extra });
+
+  add("eng-punctuation", "eng-p-x", [
+    mc(1, "Which sentence is punctuated correctly?", ["Where is my bag?", "Where is my bag.", "where is my bag?", "Where is my bag!"], "Where is my bag?", "It's a question, so it starts with a capital letter and ends with a question mark."),
+    tw(1, "Tap the word that needs a capital letter.", "We went swimming on *monday* afternoon.", "Days of the week are proper nouns, so they need a capital: Monday."),
+    tw(1, "Tap the two words that need capital letters.", "*i* think *australia* is a great country.", "The word 'I' is always a capital, and Australia is the name of a country."),
+    st(1, "Does each sentence need a question mark or a full stop at the end?", ["?", "."], [["How old are you", 0], ["I am twelve", 1], ["Can we go now", 0], ["The bus is late", 1], ["Why is the sky blue", 0]], "Questions end with a question mark. Statements end with a full stop."),
+    mc(1, "Which sentence uses capital letters correctly?", ["My dog Max loves Sydney.", "my dog max loves sydney.", "My Dog Max Loves Sydney.", "My dog max loves Sydney."], "My dog Max loves Sydney.", "Capitals go at the start of a sentence and on names (Max, Sydney), not on every word."),
+    tw(1, "Tap the word that should have a comma after it.", "For lunch I had *sandwiches* fruit and juice.", "Commas separate items in a list: sandwiches, fruit and juice."),
+    mt(1, "Match each sentence to the mark it needs at the end.", [["What a great goal", "!"], ["Is it lunchtime yet", "?"], ["The shop opens at nine", "."]], "Strong feeling → exclamation mark, question → question mark, statement → full stop."),
+    mc(1, "What are quotation marks (speech marks) used for?", ["To show the exact words someone says", "To end a sentence", "To join two sentences", "To separate items in a list"], "To show the exact words someone says", "Speech marks go around the words a person actually says: \"Hello,\" said Ben."),
+
+    mc(2, "Three girls each own a bike. Which sentence is correct?", ["The girls' bikes were red.", "The girls bikes' were red.", "The girl's bike's were red.", "The girls bikes were red."], "The girls' bikes were red.", "For a plural ending in s, the apostrophe goes after the s: girls'."),
+    tw(2, "Tap the word that needs an apostrophe because letters are missing.", "I *cant* find my shoes anywhere.", "Can't is short for cannot. The apostrophe shows where letters were left out."),
+    mc(2, "Which sentence punctuates the speech correctly?", ["\"Come here,\" said Mum.", "\"Come here\" said Mum.", "Come here, said \"Mum.\"", "\"Come here, said Mum.\""], "\"Come here,\" said Mum.", "Only the spoken words go inside the speech marks, with a comma before the closing mark."),
+    mt(2, "Match each contraction to its full form.", [["can't", "cannot"], ["you'll", "you will"], ["we've", "we have"], ["didn't", "did not"]], "The apostrophe replaces the missing letters."),
+    mc(2, "Which sentence is correct?", ["The cat licked its paw.", "The cat licked it's paw."], "The cat licked its paw.", "'Its' (no apostrophe) means belonging to it. 'It's' always means 'it is' or 'it has'."),
+    tw(2, "Tap the word that needs an apostrophe to show ownership.", "We played at *Toms* house after school.", "The house belongs to Tom, so it's Tom's house."),
+    st(2, "Should each gap be 'its' or 'it's'?", ["its", "it's"], [["___ going to rain.", 1], ["The dog wagged ___ tail.", 0], ["___ my turn next.", 1], ["The tree lost ___ leaves.", 0]], "Use it's only if you can say 'it is' or 'it has' instead."),
+    mc(2, "Why is there a comma in 'After dinner, we watched a movie'?", ["It comes after an opening phrase", "It separates items in a list", "It shows ownership", "It ends the sentence"], "It comes after an opening phrase", "A comma often follows an opening phrase or clause, before the main part of the sentence."),
+
+    mc(3, "Which sentence uses a colon correctly?", ["You will need three things: a pen, a ruler and a rubber.", "You will need: three things a pen, a ruler and a rubber.", "You: will need three things, a pen a ruler and a rubber.", "You will need three things a pen: a ruler and a rubber."], "You will need three things: a pen, a ruler and a rubber.", "A colon comes after a complete clause to introduce a list or explanation."),
+    mc(3, "Which sentence uses a semicolon correctly?", ["It was late; we went home.", "It was; late we went home.", "It was late we; went home.", "It; was late we went home."], "It was late; we went home.", "A semicolon joins two complete, closely related sentences."),
+    tw(3, "Tap the word that should be followed by a comma.", "When the bell *rang* everyone ran outside.", "The opening clause 'When the bell rang' needs a comma before the main clause."),
+    mc(3, "Which is the correct way to show toys belonging to the children?", ["the children's toys", "the childrens' toys", "the childrens toys", "the children toy's"], "the children's toys", "'Children' is already plural and doesn't end in s, so add 's: children's."),
+    od(3, "Put the parts in order to make a correctly punctuated sentence.", ["\"I can't wait,\"", "said Ava,", "\"for the holidays!\""], "Start", "End", "When speech is split, the speaker tag goes in the middle with commas on both sides."),
+    mc(3, "What are the brackets doing in 'Our teacher (Mr Lee) is very funny'?", ["Adding extra information", "Showing a question", "Showing speech", "Joining two lists"], "Adding extra information", "Brackets hold extra information. The sentence still makes sense without it."),
+    tw(3, "Tap the two words that need apostrophes.", "*Jacks* mum said *theyre* coming at six.", "Jack's shows ownership. They're is short for 'they are'."),
+    mc(3, "Which one is a run-on sentence that needs fixing?", ["I love soccer I play every Saturday.", "I love soccer, and I play every Saturday.", "I love soccer. I play every Saturday.", "I love soccer; I play every Saturday."], "I love soccer I play every Saturday.", "Two complete sentences can't just run together. Fix it with a full stop, a semicolon, or a comma plus 'and'."),
+  ]);
+
+  add("eng-spelling", "eng-s-x", [
+    mc(1, "Which word is spelt correctly?", ["because", "becuase", "becos", "beacause"], "because", "Because: be-cause."),
+    tw(1, "Tap the word that is spelt wrong.", "The sunset was *beautyful* tonight.", "The correct spelling is beautiful: the y changes to i before -ful."),
+    typed(1, "Spell the plural of 'box'.", ["boxes"], "Words ending in x add -es: boxes."),
+    typed(1, "Spell the past tense of 'jump' (yesterday I ___).", ["jumped"], "Add -ed: jumped."),
+    mt(1, "Match each word to its meaning.", [["sea", "the ocean"], ["see", "to look"], ["two", "the number 2"], ["too", "also"]], "Homophones sound the same but are spelt differently and mean different things."),
+    mc(1, "Choose the correct word: 'I ___ the answer.'", ["know", "no", "now", "knot"], "know", "'Know' (with a silent k) means to have the information."),
+    od(1, "Put these words in alphabetical order.", ["dog", "duck", "elephant", "fish"], "A", "Z", "Dog and duck both start with d, so look at the second letter: o comes before u."),
+    tw(1, "Tap the misspelt word.", "We went to the beach on *wensday*.", "The correct spelling is Wednesday, with a silent d: Wed-nes-day."),
+
+    mc(2, "Which word is spelt correctly?", ["government", "goverment", "govenment", "guvernment"], "government", "Government comes from 'govern' + 'ment', so keep the n."),
+    mt(2, "Match each word to its plural.", [["knife", "knives"], ["tooth", "teeth"], ["potato", "potatoes"], ["city", "cities"]], "f → ves; some plurals are irregular (teeth); some o words add -es; y after a consonant → ies."),
+    mc(2, "Choose the correct word: 'The wind ___ the leaves away.'", ["blew", "blue"], "blew", "Blew is the past tense of blow. Blue is a colour."),
+    tw(2, "Tap the two misspelt words.", "I *beleive* it will be *wierd* weather.", "Believe follows 'i before e'. Weird is a famous exception: e before i."),
+    typed(2, "Add -ing to 'swim'.", ["swimming"], "Short vowel + one consonant: double the consonant, so swimming."),
+    typed(2, "Add -ing to 'make'.", ["making"], "Drop the silent e before adding -ing: making."),
+    mc(2, "Which is correct?", ["You're welcome.", "Your welcome."], "You're welcome.", "You're = you are. Your = belonging to you."),
+    st(2, "Is each word spelt correctly?", ["Correct", "Wrong"], [["tomorrow", 0], ["untill", 1], ["beginning", 0], ["occured", 1], ["surprise", 0]], "Until has one l. Occurred has double c and double r."),
+
+    mc(3, "Which word is spelt correctly?", ["embarrass", "embarass", "embarras", "embaress"], "embarrass", "Embarrass has double r and double s."),
+    mc(3, "Choose the correct word: 'The new rule had a big ___ on students.'", ["effect", "affect"], "effect", "Effect is usually a noun (a result). Affect is usually a verb (to change something)."),
+    typed(3, "Add the suffix -ful to 'beauty'.", ["beautiful"], "When a word ends in consonant + y, change the y to i: beautiful."),
+    tw(3, "Tap the two misspelt words.", "The *restaraunt* was *definately* busy.", "The correct spellings are restaurant and definitely (it has 'finite' in it)."),
+    mc(3, "Choose the correct word: 'The ___ of our school gave a speech.'", ["principal", "principle"], "principal", "The principal is the head of a school (think 'pal'). A principle is a rule or belief."),
+    mt(3, "Match each prefix and word to the correct spelling.", [["dis + appear", "disappear"], ["mis + spell", "misspell"], ["un + necessary", "unnecessary"], ["im + mature", "immature"]], "Adding a prefix doesn't change the base word, so sometimes you get a double letter (misspell, unnecessary)."),
+    mc(3, "Which word is spelt correctly?", ["conscience", "concience", "consience", "conscence"], "conscience", "Conscience is 'con' + 'science'."),
+    od(3, "Put these words in alphabetical order.", ["thorough", "though", "thought", "through", "throw"], "A", "Z", "Compare letter by letter: thor, thou, thou-ght (longer than though), thro-u, thro-w."),
+  ]);
+
+  const FARM = "Sam's grandma lives on a farm near Ballarat. Every school holidays, Sam visits her. Each morning he feeds the chickens and collects the eggs in a blue basket. In the afternoon, they ride the old tractor down to the dam to check on the sheep. Sam's favourite job is giving the baby lamb its bottle of milk.";
+  const LIBRARY = "The school library is getting a makeover. Over the summer, workers painted the walls bright yellow and added new beanbags to the reading corner. There are also six new computers near the front desk. Ms Tran, the librarian, says the best change is the new shelf of graphic novels, which students asked for in a survey last year.";
+  const JESS = "Jess stared at the empty page. The story competition closed at midnight, and she still had nothing. She glanced at the clock: 9:45. Sighing, she pushed back her chair and wandered to the window. Outside, a possum was balancing on the fence, tail curled tight, stretching towards the lemon tree. Jess grinned, grabbed her pen and began to write.";
+  const PHONES = "Every year, Australians throw away millions of mobile phones. Most end up in drawers or, worse, in landfill, where toxic metals can leak into the soil. Yet phones contain valuable materials such as gold, silver and copper that can be recovered and reused. Recycling a tonne of old phones can recover more gold than mining a tonne of ore. If every household recycled its old devices, we would save resources, protect the environment and even create jobs. Surely that is worth a trip to the drop-off bin.";
+  const P = (passage) => ({ passage, showPassage: true });
+  add("eng-reading", "eng-r-x", [
+    mc(1, "Where does Sam's grandma live?", ["On a farm near Ballarat", "In the city", "By the beach", "In Sydney"], "On a farm near Ballarat", "The first sentence says she lives on a farm near Ballarat.", P(FARM)),
+    typed(1, "What colour is the egg basket?", ["blue"], "Sam collects the eggs in a blue basket.", P(FARM)),
+    mc(1, "What is Sam's favourite job?", ["Giving the baby lamb its bottle", "Feeding the chickens", "Riding the tractor", "Collecting the eggs"], "Giving the baby lamb its bottle", "The last sentence tells you his favourite job.", P(FARM)),
+    od(1, "Put Sam's day in order.", ["He feeds the chickens", "He collects the eggs", "They ride the tractor to the dam"], "Morning", "Afternoon", "Each morning he feeds the chickens and collects eggs; in the afternoon they ride to the dam.", P(FARM)),
+    tw(1, "Tap the word that tells you when Sam visits.", "Every school *holidays*, Sam visits her.", "He visits every school holidays.", P(FARM)),
+    typed(1, "How many new computers are there?", ["6", "six"], "The passage says there are six new computers near the front desk.", P(LIBRARY)),
+    mc(1, "What colour are the library walls now?", ["Bright yellow", "Blue", "White", "Green"], "Bright yellow", "Workers painted the walls bright yellow.", P(LIBRARY)),
+    mc(1, "Who is Ms Tran?", ["The librarian", "The principal", "A student", "A painter"], "The librarian", "The passage says 'Ms Tran, the librarian'.", P(LIBRARY)),
+    mc(1, "Why did the library add graphic novels?", ["Students asked for them in a survey", "They were cheap", "Ms Tran wrote them", "They were a gift"], "Students asked for them in a survey", "The last sentence says students asked for them in a survey last year.", P(LIBRARY)),
+
+    mc(2, "How does Jess feel at the start of the passage?", ["Stuck and worried", "Excited", "Angry at a friend", "Sleepy and bored"], "Stuck and worried", "She has an empty page, the deadline is close and she has 'nothing'. Those clues suggest she's stuck and worried.", P(JESS)),
+    mc(2, "About how long does Jess have before the competition closes?", ["About 2 and a quarter hours", "About 45 minutes", "About 9 hours", "About 12 hours"], "About 2 and a quarter hours", "From 9:45 pm to midnight is 2 hours and 15 minutes.", P(JESS)),
+    mc(2, "What gives Jess an idea for her story?", ["A possum on the fence", "The clock", "Her mum", "A book"], "A possum on the fence", "Right after she watches the possum, she grins and starts writing.", P(JESS)),
+    tw(2, "Tap the word that shows Jess's mood has changed.", "Jess *grinned*, grabbed her pen and began to write.", "Grinning shows she's now happy and excited, not stuck.", P(JESS)),
+    od(2, "Put the events in order.", ["Jess stared at the empty page", "She glanced at the clock", "She wandered to the window", "She saw a possum on the fence", "She began to write"], "First", "Last", "Follow the passage from start to finish.", P(JESS)),
+    mc(2, "What does 'Sighing' suggest about Jess?", ["She is frustrated", "She is laughing", "She is asleep", "She is scared"], "She is frustrated", "People often sigh when they're fed up or frustrated.", P(JESS)),
+    mc(2, "What is the main idea of the passage?", ["Jess finds inspiration in something ordinary", "Possums like lemons", "Competitions are too hard", "Jess is late for school"], "Jess finds inspiration in something ordinary", "The passage is about Jess getting unstuck when she notices an everyday moment.", P(JESS)),
+
+    mc(3, "What is the writer's main purpose?", ["To persuade readers to recycle old phones", "To explain how phones are made", "To sell new phones", "To tell a story about a phone"], "To persuade readers to recycle old phones", "The writer gives reasons and ends by urging the reader to act, which is persuasive writing.", P(PHONES)),
+    mc(3, "Which of these is a fact rather than an opinion?", ["Phones contain gold, silver and copper", "Surely that is worth a trip to the drop-off bin", "Recycling is the best thing you can do", "Old phones are useless"], "Phones contain gold, silver and copper", "A fact can be checked and proven. The others are opinions or judgements.", P(PHONES)),
+    tw(3, "Tap the word that shows the writer thinks landfill is the worst place for old phones.", "Most end up in drawers or, *worse*, in landfill.", "'Worse' shows the writer's judgement that landfill is the worst outcome.", P(PHONES)),
+    mc(3, "What is the effect of the last sentence, 'Surely that is worth a trip to the drop-off bin'?", ["It uses confident, persuasive language to urge the reader to act", "It describes a sound", "It gives a statistic", "It compares two things using 'like'"], "It uses confident, persuasive language to urge the reader to act", "'Surely' makes it sound obvious, pushing the reader to agree and do something.", P(PHONES)),
+    st(3, "Is each statement a fact or an opinion?", ["Fact", "Opinion"], [["Phones contain copper", 0], ["Everyone should recycle their phone", 1], ["Toxic metals can leak into soil", 0], ["Recycling is worth the effort", 1]], "Facts can be checked. Opinions say what someone thinks or believes.", P(PHONES)),
+    mc(3, "According to the writer, which of these is NOT a benefit of recycling phones?", ["Making new phones cheaper", "Saving resources", "Protecting the environment", "Creating jobs"], "Making new phones cheaper", "The writer lists saving resources, protecting the environment and creating jobs, but never mentions price.", P(PHONES)),
+    mc(3, "What does 'recovered' mean in this passage?", ["Taken back out so it can be used again", "Feeling better after being sick", "Covered up again", "Lost forever"], "Taken back out so it can be used again", "The metals are 'recovered and reused', so here it means taken back out of the old phones.", P(PHONES)),
+  ]);
+
+  add("eng-grammar", "eng-g-x", [
+    st(1, "Is each word a noun, a verb or an adjective?", ["Noun", "Verb", "Adjective"], [["teacher", 0], ["run", 1], ["green", 2], ["city", 0], ["shout", 1], ["soft", 2]], "Nouns name things, verbs are actions, adjectives describe."),
+    mc(1, "Choose the correct word: 'She ___ to school every day.'", ["walks", "walk", "walking", "were walk"], "walks", "With 'she' in the present tense, the verb adds -s: she walks."),
+    tw(1, "Tap the proper noun.", "Yesterday *Olivia* went to the shops.", "Proper nouns name a particular person, place or thing, and start with a capital letter."),
+    mc(2, "Which sentence is in the past tense?", ["We played cricket after school.", "We play cricket after school.", "We will play cricket after school.", "We are playing cricket after school."], "We played cricket after school.", "'Played' (with -ed) shows it already happened."),
+    tw(2, "Tap the two adverbs.", "The dog barked *loudly* and ran *quickly* away.", "Adverbs describe how an action is done. Many end in -ly."),
+    mt(2, "Match each sentence to its tense.", [["I ate", "past"], ["I eat", "present"], ["I will eat", "future"]], "Past = already happened, present = now, future = will happen."),
+    mc(2, "Choose the correct word: 'This is the ___ cake I've ever tasted.'", ["best", "goodest", "better", "most good"], "best", "Good, better, best. Use 'best' when comparing three or more."),
+    mc(3, "Which sentence is complex (a main clause plus a dependent clause)?", ["Although it was cold, we went swimming.", "It was cold.", "It was cold and we went swimming.", "Go swimming!"], "Although it was cold, we went swimming.", "'Although it was cold' can't stand alone. It depends on the main clause."),
+    tw(3, "Tap the word that is the subject of the sentence (who did the action).", "The tall *girl* in the red hat won the race.", "The girl is the one who won. 'Tall' and 'in the red hat' just describe her."),
+    mc(3, "Which sentence is in the active voice?", ["The dog chased the ball.", "The ball was chased by the dog.", "The ball was chased.", "The ball had been chased by the dog."], "The dog chased the ball.", "In the active voice the subject does the action: the dog chased."),
+    st(3, "Is each one a complete sentence or a fragment?", ["Sentence", "Fragment"], [["The bus arrived late.", 0], ["Running down the hall.", 1], ["When we got home.", 1], ["She smiled.", 0]], "A complete sentence needs a subject and a verb and makes sense on its own."),
+  ]);
+
+  add("eng-vocab", "eng-v-x", [
+    mt(1, "Match each word to a word that means the same.", [["small", "tiny"], ["fast", "quick"], ["shut", "close"], ["glad", "happy"]], "Synonyms have the same or similar meanings."),
+    mc(1, "Which word means 'a person who writes books'?", ["author", "actor", "artist", "athlete"], "author", "An author writes books."),
+    tw(1, "Tap the word that means 'very big'.", "We saw a *huge* whale near the boat.", "Huge means very big."),
+    st(1, "Does each word mean the same as 'happy' or the opposite?", ["Same (synonym)", "Opposite (antonym)"], [["joyful", 0], ["miserable", 1], ["cheerful", 0], ["gloomy", 1]], "Joyful and cheerful are synonyms. Miserable and gloomy are antonyms."),
+    mc(2, "'The puppy was timid and hid behind the couch.' What does 'timid' mean?", ["shy and easily scared", "very loud", "hungry", "sleepy"], "shy and easily scared", "Hiding behind the couch is the clue: timid means shy or nervous."),
+    mt(2, "Match each suffix to its meaning.", [["-ful", "full of"], ["-less", "without"], ["-er", "a person who"], ["-able", "able to be"]], "hopeful, careless, teacher, washable."),
+    tw(2, "Tap the word with a prefix that means 'not'.", "It was *impossible* to finish the test in time.", "Im- means not: impossible = not possible."),
+    mc(3, "'Despite his fatigue, the runner persevered to the finish line.' What does 'persevered' mean?", ["kept going despite difficulty", "gave up", "walked slowly", "cheated"], "kept going despite difficulty", "'Despite his fatigue' tells you it was hard, but he still reached the finish."),
+    mt(3, "Match each word root to its meaning.", [["aqua", "water"], ["port", "carry"], ["graph", "write"], ["micro", "small"]], "aquarium, transport, autograph, microscope."),
+  ]);
+
+  add("eng-figurative", "eng-f-x", [
+    st(1, "Is each one a simile or a metaphor?", ["Simile", "Metaphor"], [["as light as a feather", 0], ["He is a shining star", 1], ["She swims like a fish", 0], ["The road is a ribbon", 1]], "Similes use 'like' or 'as'. Metaphors say something IS something else."),
+    tw(1, "Tap the word that is onomatopoeia.", "The door slammed with a loud *bang*.", "Bang sounds like the noise it describes."),
+    mc(1, "Which is an example of alliteration?", ["Big brown bears bounce", "The cat sat on the mat", "I am so tired", "It was very cold"], "Big brown bears bounce", "Alliteration repeats the same starting sound: b, b, b, b."),
+    mt(2, "Match each idiom to its meaning.", [["cold feet", "nervous before something"], ["hit the books", "study hard"], ["once in a blue moon", "very rarely"], ["over the moon", "very happy"]], "Idioms mean something different from their literal words."),
+    tw(2, "Tap the two words that personify the car.", "The old car *groaned* up the hill and *coughed* at the top.", "Groaning and coughing are human actions given to the car."),
+    mc(2, "'My backpack weighs a million kilos!' Why does the writer exaggerate?", ["To show how heavy it feels", "Because it's true", "To compare it to an animal", "To copy a sound"], "To show how heavy it feels", "Hyperbole exaggerates for effect, here to show how heavy the bag feels."),
+    mc(3, "'Hope is a candle in the dark.' What does this metaphor suggest?", ["Hope gives comfort when things are hard", "Candles are dangerous", "It is night time", "Hope is made of wax"], "Hope gives comfort when things are hard", "A candle gives light in darkness, just as hope helps in hard times."),
+    st(3, "Which technique is each example?", ["Simile", "Personification", "Hyperbole"], [["The kettle screamed", 1], ["I've waited forever", 2], ["as tall as a giraffe", 0], ["The moon winked at me", 1], ["ran like a rocket", 0], ["a mountain of homework", 2]], "Similes compare with like/as, personification gives human actions, and hyperbole exaggerates."),
+    tw(3, "Tap the oxymoron.", "It was an *open secret* that Sam liked Mia.", "'Open secret' joins opposites: something secret that everyone knows."),
   ]);
 
   // ------------------------------------------------------------ 4. The Cartesian Plane topic
