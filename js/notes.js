@@ -60,6 +60,7 @@ function notesEditorHTML(mode) {
     <div class="notes-editor" data-mode="${mode}">
       <div class="notes-list"></div>
       <div class="notes-body hidden">
+        <div class="muted small notes-from hidden"></div>
         <input type="text" class="notes-title" maxlength="80" placeholder="Note name" aria-label="Note name">
         ${mode === "all" ? `<select class="notes-topic" aria-label="Topic"></select>` : ""}
         <textarea class="notes-text" placeholder="Write anything you want to remember…" aria-label="Note"></textarea>
@@ -76,7 +77,7 @@ function wireNotesEditor(root, { mode, topicId, openId } = {}) {
   const listEl = $(".notes-list", ed), body = $(".notes-body", ed);
   const titleIn = $(".notes-title", ed), textIn = $(".notes-text", ed), topicSel = $(".notes-topic", ed);
   const status = $(".notes-status", ed);
-  let notes = [], current = null, timer = null;
+  let notes = [], current = null, timer = null, othersOpen = false;
 
   if (topicSel) {
     const groups = [["Maths", MATHS_TOPICS], ["English", ENGLISH_TOPICS.filter((t) => !t.special)], ["Science", SCIENCE_TOPICS]];
@@ -95,8 +96,18 @@ function wireNotesEditor(root, { mode, topicId, openId } = {}) {
         : `<p class="muted small" style="margin:0;">No notes yet. Make one here, or from the 📝 Notes panel on any topic.</p>`;
     } else {
       html = list.length ? `<div class="notes-chips">${list.map(chip).join("")}</div>` : `<p class="muted small" style="margin:0;">No notes for this topic yet.</p>`;
+      // Every other note too, so you can read or edit them without leaving the questions.
+      const others = notes.filter((n) => n.topicId !== topicId);
+      if (others.length) {
+        const order = [...new Set(others.map((n) => n.topicId))];
+        html += `<details class="notes-others"${othersOpen || (current && current.topicId !== topicId) ? " open" : ""}>
+          <summary>All my other notes (${others.length})</summary>
+          ${order.map((tid) => `<div class="notes-group">${esc(noteTopicName(tid))}</div><div class="notes-chips">${others.filter((n) => n.topicId === tid).map(chip).join("")}</div>`).join("")}
+        </details>`;
+      }
     }
-    listEl.innerHTML = html + `<button type="button" class="btn secondary sm notes-new">＋ New note</button>`;
+    listEl.innerHTML = html + `<button type="button" class="btn secondary sm notes-new">＋ New note${mode === "topic" ? " for this topic" : ""}</button>`;
+    $(".notes-others", listEl)?.addEventListener("toggle", (e) => { othersOpen = e.target.open; });
     body.classList.toggle("hidden", !current);
   }
 
@@ -107,6 +118,9 @@ function wireNotesEditor(root, { mode, topicId, openId } = {}) {
       titleIn.value = note.title || "";
       textIn.value = note.body || "";
       if (topicSel) topicSel.value = note.topicId;
+      const from = $(".notes-from", ed);
+      from.textContent = `From ${noteTopicName(note.topicId)}`;
+      from.classList.toggle("hidden", mode !== "topic" || note.topicId === topicId);
       status.textContent = note.updatedAt ? `Saved ${fmtDateTime(note.updatedAt)}` : "";
       store("apex-notes-last", { topicId: note.topicId, id: note.id });
     }
@@ -178,7 +192,6 @@ function notesPanelHTML() {
         <button type="button" class="btn ghost sm notes-close" aria-label="Close notes">✕</button>
       </div>
       ${notesEditorHTML("topic")}
-      <a class="small notes-all" href="#/notes">See all my notes →</a>
     </aside>
     <button type="button" class="notes-fab" id="notes-fab" aria-label="Open my notes">📝 Notes</button>`;
 }

@@ -796,7 +796,7 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
   .notes-close, .notes-fab { display: none !important; }
 }
 .notes-editor { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
-.notes-list { display: grid; gap: 8px; justify-items: start; overflow-y: auto; max-height: 190px; }
+.notes-list { display: grid; gap: 8px; justify-items: start; overflow-y: auto; max-height: 260px; }
 .notes-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .notes-group { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: 4px; }
 .notes-chip {
@@ -810,6 +810,10 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
 .notes-title { font-weight: 700; }
 .notes-text { min-height: 180px; flex: 1; resize: vertical; line-height: 1.5; }
 .notes-foot { gap: 8px; }
+.notes-others { width: 100%; }
+.notes-others summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--accent); margin: 2px 0 4px; }
+.notes-others .notes-chips { margin-bottom: 4px; }
+.notes-from { margin-bottom: -2px; }
 .notes-all { color: var(--accent); font-weight: 600; text-decoration: none; }
 [data-mode="all"] .notes-list { max-height: none; }
 [data-mode="all"] .notes-text { min-height: 280px; }
@@ -817,3 +821,31 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
   [data-mode="all"] { display: grid; grid-template-columns: 280px minmax(0, 1fr); align-items: start; gap: 18px; }
   [data-mode="all"] .notes-list { position: sticky; top: 20px; }
 }
+
+/* ---------------- File uploads (tests) ---------------- */
+.upload-box { display: grid; gap: 8px; }
+.upload-drop {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;
+  border: 2px dashed var(--line); border-radius: 12px; background: var(--surface-2); transition: border-color .12s, background .12s;
+}
+.upload-drop:hover, .upload-drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.upload-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.upload-drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.upload-ico { font-size: 22px; }
+.upload-hint { display: block; margin-top: 2px; }
+.upload-list { display: grid; gap: 6px; }
+.upload-list:empty { display: none; }
+.upload-chip { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.upload-chip .upload-name { font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.upload-chip .muted { flex: none; max-width: 45%; text-align: right; }
+.upload-chip.error { border-color: var(--bad); }
+.upload-chip.error .muted { color: var(--bad); }
+
+/* ---------------- Update banner ---------------- */
+.update-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 60;
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 14px;
+  background: var(--ink); color: var(--surface); font-weight: 600; font-size: 14px; box-shadow: 0 12px 34px rgba(0, 0, 0, .3);
+  max-width: calc(100vw - 32px);
+}
+@media (max-width: 760px) { .update-bar { bottom: calc(76px + env(safe-area-inset-bottom)); } }

@@ -56,7 +56,7 @@ function chatPanel(host, { log, placeholder, empty, ideas = [], onSend, onChange
     } catch (e) {
       console.error("Apex: study chat failed —", e);
       pending.role = "err";
-      pending.text = "Sorry, I couldn't reach the AI. Please try again in a moment.";
+      pending.text = e.userMessage || "Sorry, I couldn't reach the AI. Please try again in a moment.";
     }
     delete pending.pending;
     while (log.length > 40) log.shift();
@@ -80,7 +80,7 @@ function takePendingAction(mode) {
 }
 
 // ---------------------------------------------------------------- AI test
-const aiTest = { log: [], draft: [], minutes: 20, types: [] }; // kept for this visit to the site
+const aiTest = { log: [], draft: [], minutes: 20, types: [], files: [] }; // kept for this visit to the site
 const AI_TEST_TYPES = {
   short: "Short answer", mc: "Multiple choice", tf: "True or false", blank: "Fill in the blank", worded: "Worded problems",
   written: "Explain in your own words (AI-marked)", passage: "Reading passage", visual: "Interactive (plot, shade, order, match, tap…)",
@@ -104,6 +104,7 @@ function aiTestMode(view, host) {
   host.innerHTML = `
     <div class="card stack">
       <p class="muted small" style="margin:0;">Tell the AI what to test you on — any subject (maths, English, science, history…), what types of questions, and how hard. It writes them straight into your test below, and you can keep chatting to add more or change them.</p>
+      <div id="tc-files">${uploadBoxHTML("The AI will use them — e.g. “Make 10 questions like the ones in my file”.")}</div>
       <div id="tc-chat"></div>
       <details class="types-box"${aiTest.types.length ? " open" : ""}><summary>Question types <span class="muted">(optional — or just tell the AI)</span></summary>
         <div class="checklist" id="tc-types">${Object.entries(AI_TEST_TYPES).map(([k, v]) => `<label class="chip-check"><input type="checkbox" value="${k}"${aiTest.types.includes(k) ? " checked" : ""}> ${v}</label>`).join("")}</div>
@@ -111,6 +112,7 @@ function aiTestMode(view, host) {
     </div>
     <div class="card stack" id="tc-draft"></div>`;
 
+  wireUploadBox($("#tc-files", host), aiTest.files);
   $("#tc-types", host).addEventListener("change", () => { aiTest.types = $$("#tc-types input:checked", host).map((b) => b.value); });
 
   const summary = () => (aiTest.draft.length
@@ -126,7 +128,8 @@ function aiTestMode(view, host) {
     async onSend(text, hidden) {
       const types = aiTest.types.map((k) => AI_TEST_TYPES[k]);
       const history = chatHistory(aiTest.log.slice(0, -2));
-      const raw = await askTutorRaw(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) building a practice test WITH a student in a chat. The test can be on ANY school subject or topic: maths, English, science, history, geography, health, languages, digital technologies, general knowledge, or anything school-appropriate they're interested in.
+      if (aiTest.files.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
+      const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) building a practice test WITH a student in a chat. The test can be on ANY school subject or topic: maths, English, science, history, geography, health, languages, digital technologies, general knowledge, or anything school-appropriate they're interested in.
 
 ${summary()}
 ${types.length ? `The student ticked these question types: ${types.join(", ")}. Use them.\n` : ""}
@@ -143,7 +146,8 @@ ${AI_QUESTION_RULES}
 ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}${hidden ? `\n\n(Extra information for you, from the student's info page:\n${hidden})` : ""}
 
 Reply with ONLY valid JSON, no markdown:
-{"reply":"a short friendly message (under 60 words) saying what you did","add":[question objects],"remove":[question numbers],"clear":false}`);
+{"reply":"a short friendly message (under 60 words) saying what you did","add":[question objects],"remove":[question numbers],"clear":false}`, aiTest.files,
+        "The student has uploaded files for this test. Unless they ask for something else, base the questions on this material. If it contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style, format and level rather than copying them. You can use passages from the files as reading passages."));
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
       const before = aiTest.draft.length;

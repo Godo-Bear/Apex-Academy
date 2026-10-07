@@ -495,6 +495,43 @@ function enterApp() {
   route();
   showLoginNotices();
   loadEvents();
+  watchForUpdates();
+}
+
+// ---------------- Updates ----------------
+// The site's version is the ?v= on the script links in index.html (bumped on every publish).
+const SITE_VERSION = ([...document.scripts].map((s) => s.src.match(/js\/app\.js\?v=([^&]+)/)).find(Boolean) || [])[1] || "";
+async function checkForUpdates() {
+  const res = await fetch(`${location.origin}${location.pathname}?update-check=${Date.now()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const latest = ((await res.text()).match(/js\/app\.js\?v=([^"'&]+)/) || [])[1] || "";
+  return { latest, newer: !!latest && latest !== SITE_VERSION };
+}
+function installUpdate(latest) {
+  location.replace(`${location.pathname}?updated=${encodeURIComponent(latest || Date.now())}${location.hash}`);
+}
+// After updating, tidy the address bar and say so.
+if (/[?&]updated=/.test(location.search)) {
+  history.replaceState(null, "", location.pathname + location.hash);
+  setTimeout(() => toast("✓ You're on the latest version"), 800);
+}
+// Quietly checks every 30 minutes and offers the update.
+function watchForUpdates() {
+  if (location.protocol === "file:") return;
+  const tick = async () => {
+    if (document.hidden || $(".update-bar")) return;
+    try {
+      const { newer, latest } = await checkForUpdates();
+      if (!newer) return;
+      const bar = document.createElement("div");
+      bar.className = "update-bar";
+      bar.innerHTML = `<span>✨ A new version of Apex Academy is ready.</span><button class="btn sm" type="button">Update</button><button class="btn ghost sm" type="button" aria-label="Later" style="color:inherit;">✕</button>`;
+      $$("button", bar)[0].addEventListener("click", () => { if (!leaveWarning || confirm(leaveWarning)) installUpdate(latest); });
+      $$("button", bar)[1].addEventListener("click", () => bar.remove());
+      document.body.appendChild(bar);
+    } catch (e) { /* offline — try again later */ }
+  };
+  setInterval(tick, 30 * 60 * 1000);
 }
 
 // ---------------- Login notices ----------------
@@ -1901,8 +1938,11 @@ function pickBuilder(view, host) {
         <label class="field" for="t-examples">Example questions <span class="muted">(optional)</span></label>
         <p class="muted small" style="margin-bottom:8px;">Paste one or more questions and the AI will write a fresh test in the same style. Leave blank to use the question bank.</p>
         <textarea id="t-examples" rows="3" style="min-height:80px;" placeholder="e.g. What is 15% of 240?"></textarea>
+        <label class="field" style="margin-top:12px;">Your files <span class="muted">(optional)</span></label>
+        <p class="muted small" style="margin-bottom:8px;">Upload a worksheet, notes, a past test or photos of your textbook. The AI writes new questions like the ones in your files.</p>
+        <div id="t-files">${uploadBoxHTML()}</div>
         <label class="small" style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-          <input type="checkbox" id="t-examples-only"> Base the whole test on my examples only (ignore the topics and difficulty above)
+          <input type="checkbox" id="t-examples-only"> Base the whole test on my examples and files only (ignore the topics and difficulty above)
         </label>
       </div>
       <div class="grid" style="grid-template-columns: 1fr 1fr;">
@@ -1922,6 +1962,8 @@ function pickBuilder(view, host) {
     btn.textContent = allOn ? "Select all" : "Clear";
   }));
 
+  const testFiles = [];
+  const uploads = wireUploadBox($("#t-files", host), testFiles);
   const examplesOnly = $("#t-examples-only", host);
   examplesOnly.addEventListener("change", () => {
     $("#t-bank", host).style.opacity = examplesOnly.checked ? ".4" : "";
@@ -1936,27 +1978,31 @@ function pickBuilder(view, host) {
     const examples = $("#t-examples", host).value.trim();
     const err = $("#t-error", host);
     hide(err);
+    if (uploads.busy()) return setMsg(err, "Your files are still loading — wait a moment, then try again.", "error");
+    const files = uploadsReady(testFiles);
+    // With files and no topics ticked, the test is just about the files.
+    const filesOnly = examplesOnly.checked || (files.length && !topicIds.length);
 
-    if (examplesOnly.checked && !examples) return setMsg(err, "Type at least one example question.", "error");
-    if (!examplesOnly.checked) {
+    if (examplesOnly.checked && !examples && !files.length) return setMsg(err, "Type at least one example question or add a file.", "error");
+    if (!filesOnly) {
       if (!topicIds.length) return setMsg(err, "Pick at least one topic.", "error");
       if (!diffs.length) return setMsg(err, "Pick at least one difficulty.", "error");
     }
 
-    if (examples) {
+    if (examples || files.length) {
       const btn = $("#t-start", host);
       btn.disabled = true;
       btn.textContent = "Writing your test…";
       try {
-        const topics = examplesOnly.checked ? null : topicIds.map(findTopic);
-        const qs = await generateAIQuestions(examples, count, topics, diffs);
+        const topics = filesOnly ? null : topicIds.map(findTopic);
+        const qs = await generateAIQuestions(examples, count, topics, diffs.length ? diffs : [1, 2, 3], testFiles);
         if (!qs.length) throw new Error("No usable questions");
         runTest(view, qs.map((q) => ({ q, topic: { id: null, name: q.topicName, icon: "🤖" } })), minutes);
       } catch (e) {
         console.error("Apex: AI test generation failed —", e);
         btn.disabled = false;
         btn.textContent = "Start test →";
-        setMsg(err, "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank.", "error");
+        setMsg(err, files.length ? "Couldn't write a test from those files. Try fewer or smaller files, or add an example question." : "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank.", "error");
       }
       return;
     }
@@ -1997,35 +2043,34 @@ Each question: {"prompt":"...","options":[...],"type":"written or point","passag
 
 // Asks the tutor for new questions modelled on the student's examples.
 // With topics: stays within those topics/difficulties. Without: matches the examples' own subject and level.
-async function generateAIQuestions(examples, count, topics, diffs) {
+async function generateAIQuestions(examples, count, topics, diffs, files = []) {
   const rules = `${AI_QUESTION_RULES}
 
 Respond with ONLY a valid JSON array of question objects — no other text, no markdown code fences.`;
 
+  const hasFiles = uploadsReady(files).length > 0;
+  const examplesBlock = examples ? `Here are example questions to match the style and structure of:
+"""
+${examples}
+"""
+` : "";
   const prompt = topics
     ? `You are writing exam questions for a Year 7 Australian curriculum test covering these topics: ${topics.map((t) => t.name).join(", ")}.
 Difficulty level(s) to write at: ${diffs.map((d) => DIFF_NAMES[d].toLowerCase()).join("/")}.
 
-Here are example questions to match the style and structure of:
-"""
-${examples}
-"""
-
+${examplesBlock}${hasFiles ? "Also use the student's uploaded files (above): base questions on their content where it fits these topics, and copy the style of any questions in them.\n" : ""}
 Write exactly ${count} new original questions in that same style, spread across the topics listed above and matching the requested difficulty level(s). Set topicName to whichever listed topic each question belongs to.
 
 ${rules}`
-    : `You are writing exam questions based on example questions a student has given you:
-"""
-${examples}
-"""
+    : `You are writing exam questions based on ${hasFiles ? `the student's uploaded files (above)${examples ? " and these example questions" : ""}` : "example questions a student has given you"}.
+${examplesBlock}
+First, work out what subject/topic this material covers and what level it is pitched at — judge this from the material itself, not from any assumed year level, and match that same level.
 
-First, work out what subject/topic these questions belong to and what level they are pitched at — judge this from the questions themselves, not from any assumed year level, and match that same level.
-
-Then write exactly ${count} new original questions on that same subject, at that same level, in a similar style and structure. Set topicName to the subject you identified, and difficulty to 1 (easier than the examples), 2 (about the same) or 3 (harder).
+Then write exactly ${count} new original questions on that same subject, at that same level. If the material contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style and format — don't copy them. If it's notes or a textbook page, test the key facts and ideas in it. Set topicName to the subject you identified, and difficulty to 1 (easier than the material), 2 (about the same) or 3 (harder).
 
 ${rules}`;
 
-  return parseAIQuestions(await askTutorRaw(prompt), count);
+  return parseAIQuestions(await askTutorRaw(await withUploads(prompt, files, "The student uploaded these files to make a practice test from.")), count);
 }
 
 // Reads JSON out of an AI reply: ignores text and code fences around it, and repairs a reply that was cut off
@@ -2511,6 +2556,14 @@ function pageSettings(view) {
       <div id="set-fb-list"></div>
     </div>
 
+    <div class="section-label">App updates</div>
+    <div class="card stack">
+      <div class="row between">
+        <span>Version <strong>${esc(SITE_VERSION || "unknown")}</strong><br><span class="muted small" id="upd-status">Updates come out often. Check here to make sure you have the newest one.</span></span>
+        <button class="btn secondary" id="upd-check">🔄 Check for updates</button>
+      </div>
+    </div>
+
     <div class="section-label">Help &amp; legal</div>
     <div class="card stack">
       <div class="row">
@@ -2559,6 +2612,27 @@ function pageSettings(view) {
     if (error) { e.target.checked = !e.target.checked; return toast("Couldn't save that."); }
     me.showPoints = e.target.checked;
     toast(e.target.checked ? "You're visible on the leaderboard" : "Your name and points are hidden");
+  });
+
+  $("#upd-check", view).addEventListener("click", async () => {
+    const btn = $("#upd-check", view), status = $("#upd-status", view);
+    if (btn.dataset.latest) return installUpdate(btn.dataset.latest);
+    btn.disabled = true; btn.textContent = "Checking…";
+    try {
+      const { newer, latest } = await checkForUpdates();
+      if (newer) {
+        status.innerHTML = `<strong style="color:var(--accent);">A new version (${esc(latest)}) is ready.</strong>`;
+        btn.dataset.latest = latest;
+        btn.className = "btn"; btn.textContent = "⬇️ Update now";
+      } else {
+        status.textContent = "✓ You're on the latest version.";
+        btn.textContent = "🔄 Check again";
+      }
+    } catch (e) {
+      status.textContent = "Couldn't check right now — are you online?";
+      btn.textContent = "🔄 Try again";
+    }
+    btn.disabled = false;
   });
 
   const fbList = $("#set-fb-list", view);

@@ -16,6 +16,7 @@ It uses the same Supabase project, so existing accounts, points and progress car
 | `js/visuals.js` | Diagrams and interactive answers (Cartesian plane, number lines, shading, protractor, order, match, tap-the-word) plus the Learn tab's "Try it" explorers |
 | `js/sci-visuals.js` | Science diagrams (particles, Moon phases, seasons, tides, forces, levers, pulleys, lab equipment, separating set-ups, chromatograms, food webs, keys…) plus the tap-the-picture and sort answer widgets |
 | `js/science.js` | The 8 Year 7 science topics (Science toolkit, Classification, Ecosystems, Resources, Earth Sun and Moon, Forces, Particle theory, Mixtures) with lessons and ~45 questions each |
+| `js/uploads.js` | File uploads for making tests: reads PDFs, Word, PowerPoint, text and photos in the browser and sends their text and pictures to the AI |
 | `js/notes.js` | My notes: named notes for each topic, in a panel next to the questions and on the My notes page (saved to the `notes` table — run `supabase/notes.sql` — with a copy on the device) |
 | `js/bank.js` | Upgrades to the question bank: tap-to-answer choices, diagrams on existing questions, new interactive questions, and the Cartesian Plane topic |
 | `js/study.js` | The Test page's AI modes: AI test chat, flashcards, and info & ideas pages |
