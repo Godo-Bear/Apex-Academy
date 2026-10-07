@@ -383,6 +383,7 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
 .mc-opt:has(input:disabled) { cursor: default; }
 .mc .mc-opt.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
 .mc .mc-opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.question .passage-ref { margin: 0 0 6px; }
 .question .passage { white-space: pre-wrap; background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin: 4px 0 12px; line-height: 1.6; }
 .question textarea { width: 100%; min-height: 80px; }
 .question textarea.correct { border-color: var(--good); }

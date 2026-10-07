@@ -905,14 +905,15 @@ function pageTopic(view, t) {
 
   function newSet() {
     $$("#diff button", view).forEach((b) => b.classList.toggle("active", +b.dataset.d === difficulty));
-    set = nextPracticeSet(t, difficulty);
+    set = groupPassages(nextPracticeSet(t, difficulty));
     const boosted = eventBoost(false).points;
     $("#pts-each", view).textContent = set.length ? `+${pointsFor(set[0], t) * boosted} pts each${boosted > 1 ? ` (⚡ ${boosted}× event)` : ""}` : "";
 
     const form = $("#qset", view);
     delete form.dataset.checked; // a fresh set can always be checked
     if (!set.length) { form.innerHTML = `<p class="muted">No questions at this level yet — try another.</p>`; return; }
-    form.innerHTML = set.map((q, i) => questionHTML(q, i)).join("") +
+    const shown = passageFlags(set);
+    form.innerHTML = set.map((q, i) => questionHTML(q, i, "", shown[i])).join("") +
       `<div class="row" style="margin-top:18px;">
         <button class="btn" type="submit" id="check">Check answers</button>
         <button class="btn secondary" type="button" id="skip-set">New set ↻</button>
@@ -992,11 +993,25 @@ function lessonHTML(topicId, { flat = false } = {}) {
     </div>`).join("");
 }
 
-function questionHTML(q, i, topicLabel = "") {
+// Keeps questions about the same reading passage next to each other (in the order they first appear).
+function groupPassages(list, getQ = (x) => x) {
+  const groups = new Map();
+  list.forEach((item, i) => {
+    const p = getQ(item).passage;
+    const key = p ? `p:${p}` : `i:${i}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  return [...groups.values()].flat();
+}
+// Shows a passage only above the first of the questions in a row that use it.
+const passageFlags = (qs) => qs.map((q, i) => !!q.passage && (i === 0 || qs[i - 1].passage !== q.passage));
+
+function questionHTML(q, i, topicLabel = "", showPassage = q.showPassage) {
   return `
     <div class="question" data-qid="${q.id}">
       ${topicLabel ? `<div class="tag" style="display:inline-block; margin-bottom:6px;">${esc(topicLabel)}</div>` : ""}
-      ${q.showPassage ? `<div class="passage">${esc(q.passage)}</div>` : ""}
+      ${showPassage ? `<div class="passage">${esc(q.passage)}</div>` : q.passage ? `<div class="muted small passage-ref">📖 Use the passage above.</div>` : ""}
       <div class="prompt"><span class="num">${i + 1}.</span>${esc(q.prompt)}</div>
       ${isVisualInput(q) ? `<input type="hidden" data-qid="${q.id}" value="">${visualHTML(q)}`
       : `${visualHTML(q)}${q.answerType === "written" ? `<textarea data-qid="${q.id}" rows="3" placeholder="Write your answer in your own words"></textarea>`
@@ -1055,7 +1070,7 @@ function markQuestion(row, q, correct, { yourAnswer, feedback } = {}) {
     try {
       box.textContent = await askTutor(`You are a friendly Year 7 tutor. Give a clear, numbered, step-by-step walkthrough for solving this question:
 "${q.prompt}"
-${q.visual ? `(The question shows: ${describeVisual(q.visual)}.)\n` : ""}
+${q.passage ? `It is about this passage: "${q.passage}"\n` : ""}${q.visual ? `(The question shows: ${describeVisual(q.visual)}.)\n` : ""}
 The correct answer is: "${displayAnswer(q)}"
 
 Break the solution into short numbered steps a Year 7 student could follow easily. Keep it concise, no markdown formatting.`);
@@ -2130,6 +2145,8 @@ Respond with ONLY a valid JSON array with one item per answer, in order, no othe
 
 // opts.noPoints: practice only (e.g. a quiz from your own flashcards). opts.again: label for the button after.
 function runTest(view, items, minutes, opts = {}) {
+  items = groupPassages(items, (x) => x.q);
+  const shown = passageFlags(items.map((x) => x.q));
   let secondsLeft = minutes * 60;
   let timer = null;
   leaveWarning = "Leave the test? Your answers won't be saved.";
@@ -2140,7 +2157,7 @@ function runTest(view, items, minutes, opts = {}) {
       <span class="timer" id="t-clock"></span>
     </div>
     <form class="card" id="t-form" autocomplete="off">
-      ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name)).join("")}
+      ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name, shown[i])).join("")}
       <div class="row between" style="margin-top:18px;">
         <button class="btn ghost" type="button" id="t-quit">Quit</button>
         <button class="btn" type="submit">Submit test</button>
@@ -2212,7 +2229,7 @@ function runTest(view, items, minutes, opts = {}) {
         ${opts.noPoints ? statCard("Points", `<span class="muted small" style="font-size:15px;">Practice only</span>`) : statCard("Points" + (earned ? boostNote(true) : ""), "+" + earned)}
       </div>
       <div class="card" id="review">
-        ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name)).join("")}
+        ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name, shown[i])).join("")}
       </div>
       <div class="row" style="margin-top:16px;"><a class="btn" href="#/test" id="again">${esc(opts.again || "Build another test")}</a></div>`;
 

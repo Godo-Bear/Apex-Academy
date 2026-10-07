@@ -438,6 +438,13 @@
   ]);
 
 
+  // Older reading questions have their passage inside the prompt ("Read: '…'\n\nPart A: …").
+  // Split it out so the passage can be shown once above all the questions about it.
+  topic("eng-reading").questions.forEach((q) => {
+    const m = !q.passage && String(q.prompt).match(/^Read: '([\s\S]+?)'\s*\n\n([\s\S]+)$/);
+    if (m) { q.passage = m[1]; q.showPassage = true; q.prompt = m[2].replace(/^Part [A-Z]: */, ""); }
+  });
+
   // More English questions, so every topic has 15 at each level.
   const mixed = (arr, seed) => {
     let x = [...seed].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
