@@ -286,8 +286,7 @@ function openModal(name) {
 }
 
 // Shows the user's past messages and any admin replies inside the feedback modal.
-async function loadMyFeedback() {
-  const box = $("#my-feedback");
+async function loadMyFeedback(box = $("#my-feedback")) {
   const { data, error } = await sb.from("feedback").select("*").eq("user_id", authUser.id).order("created_at", { ascending: false }).limit(10);
   if (error || !data?.length) { box.innerHTML = ""; return; }
   box.innerHTML = `<div class="section-label" style="margin-top:8px;">Your messages</div>` + data.map((f) => `
@@ -310,22 +309,24 @@ document.addEventListener("keydown", (e) => {
 });
 $("#menu-admin").addEventListener("click", () => hide($("#modal-menu")));
 $("#menu-settings").addEventListener("click", () => hide($("#modal-menu")));
+$("#menu-notes").addEventListener("click", () => hide($("#modal-menu")));
 
-$("#feedback-send").addEventListener("click", async () => {
-  const message = $("#feedback-message").value.trim();
+// Sends feedback from a form with a category select, a message box and a send button.
+async function sendFeedback(catEl, msgEl, btn, listBox) {
+  const message = msgEl.value.trim();
   if (!message) return toast("Write a message first.");
-  const btn = $("#feedback-send");
   btn.disabled = true;
   const { error } = await sb.from("feedback").insert({
     user_id: authUser.id, username: me.name, avatar: "🎓",
-    category: $("#feedback-category").value, message, completed: false,
+    category: catEl.value, message, completed: false,
   });
   btn.disabled = false;
   if (error) { console.error(error); return toast("Couldn't send — try again."); }
-  $("#feedback-message").value = "";
+  msgEl.value = "";
   toast("Thanks — feedback sent!");
-  loadMyFeedback();
-});
+  loadMyFeedback(listBox);
+}
+$("#feedback-send").addEventListener("click", () => sendFeedback($("#feedback-category"), $("#feedback-message"), $("#feedback-send"), $("#my-feedback")));
 
 // ---------------- Auth ----------------
 let authMode = "login";
@@ -483,7 +484,7 @@ async function loadCustomQuestions() {
 
 // ---------------- App shell & routing ----------------
 function enterApp() {
-  const items = me.isAdmin ? [...NAV, { route: "admin", label: "Admin", icon: "🛠" }] : NAV;
+  const items = [...NAV, { route: "notes", label: "My notes", icon: "🗒️" }, ...(me.isAdmin ? [{ route: "admin", label: "Admin", icon: "🛠" }] : [])];
   $("#nav").innerHTML = items.map((n) =>
     `<a class="nav-link" href="#/${n.route}" data-route="${n.route}"><span class="ico">${n.icon}</span><span>${n.label}</span></a>`).join("");
   $("#tabbar").innerHTML = NAV.map((n) =>
@@ -692,11 +693,12 @@ function route() {
   lastHash = location.hash;
   const [page = "home", arg] = location.hash.replace(/^#\/?/, "").split("/");
   const view = $("#view");
-  const pages = { home: pageHome, practice: pagePractice, test: pageTest, tutor: pageTutor, progress: pageProgress, admin: pageAdmin, settings: pageSettings };
+  const pages = { home: pageHome, practice: pagePractice, test: pageTest, tutor: pageTutor, progress: pageProgress, notes: pageNotes, admin: pageAdmin, settings: pageSettings };
   const render = pages[page] || pageHome;
   const navRoute = pages[page] ? page : "home";
   $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === navRoute));
   view.innerHTML = "";
+  view.closest("main").classList.remove("with-notes");
   render(view, arg);
   window.scrollTo(0, 0);
 }
@@ -850,7 +852,8 @@ function pageTopic(view, t) {
   let set = [];
 
   const worked = t.workedExample ? [1, 2, 3].filter((d) => t.workedExample[d]) : [];
-  view.innerHTML = `
+  view.closest("main").classList.add("with-notes");
+  view.innerHTML = `<div class="topic-layout"><div class="topic-main">
     <a class="back" href="#/practice">← All topics</a>
     <div class="page-head">
       <h1>${t.icon} ${esc(t.name)}</h1>
@@ -889,7 +892,10 @@ function pageTopic(view, t) {
       </div>
       <form id="qset" autocomplete="off"></form>
     </div>
+    </div>${notesPanelHTML()}</div>
   `;
+  const notes = wireNotesPanel(view, t);
+  cleanup = () => notes.flush();
 
   wireExplorer($("#tab-learn", view));
   $$("#diff button", view).forEach((b) => b.addEventListener("click", () => { difficulty = +b.dataset.d; newSet(); }));
@@ -2491,11 +2497,24 @@ function pageSettings(view) {
       </label>
     </div>
 
+    <div class="section-label">Feedback</div>
+    <div class="card stack" id="set-feedback">
+      <p class="muted small" style="margin:0;">Found a bug, have an idea, or a question? Send it to the site owner. Replies show up below.</p>
+      <select id="set-fb-category">
+        <option value="bug">Bug report</option>
+        <option value="suggestion">Suggestion</option>
+        <option value="question">Question</option>
+        <option value="other">Other</option>
+      </select>
+      <textarea id="set-fb-message" placeholder="What's on your mind?"></textarea>
+      <button class="btn" id="set-fb-send" style="align-self:flex-start;">Send feedback</button>
+      <div id="set-fb-list"></div>
+    </div>
+
     <div class="section-label">Help &amp; legal</div>
     <div class="card stack">
       <div class="row">
         <button class="btn secondary" data-open="terms">📄 Terms and Conditions</button>
-        <button class="btn secondary" data-open="feedback">💬 Send feedback</button>
         <button class="btn ghost" id="req-delete">Request account deletion</button>
       </div>
       <button class="btn secondary" id="set-logout" style="align-self:flex-start;">⏻ Log out</button>
@@ -2542,10 +2561,15 @@ function pageSettings(view) {
     toast(e.target.checked ? "You're visible on the leaderboard" : "Your name and points are hidden");
   });
 
+  const fbList = $("#set-fb-list", view);
+  $("#set-fb-send", view).addEventListener("click", () => sendFeedback($("#set-fb-category", view), $("#set-fb-message", view), $("#set-fb-send", view), fbList));
+  loadMyFeedback(fbList);
+
   $("#req-delete", view).addEventListener("click", () => {
-    openModal("feedback");
-    $("#feedback-category").value = "other";
-    $("#feedback-message").value = "Please delete my account and data.";
+    $("#set-fb-category", view).value = "other";
+    $("#set-fb-message", view).value = "Please delete my account and data.";
+    $("#set-feedback", view).scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#set-fb-message", view).focus({ preventScroll: true });
   });
   $("#set-logout", view).addEventListener("click", logout);
 }
