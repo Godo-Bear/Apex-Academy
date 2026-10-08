@@ -2316,7 +2316,7 @@ const tutorLog = []; // kept for the session so switching pages doesn't wipe the
 function pageTutor(view) {
   let pendingImage = null;
   view.innerHTML = `
-    <div class="page-head"><h1>AI Tutor</h1><p>Ask any maths or English question and get a friendly explanation.</p></div>
+    <div class="page-head"><h1>AI Tutor</h1><p>Ask about any school subject — maths, English, science and more — and get a friendly explanation. You can send a photo of your working too.</p></div>
     <div class="card">
       <div class="chat" id="chat"></div>
       <div class="attach-preview hidden" id="attach"><img alt=""><button class="btn ghost sm" id="attach-x">Remove photo</button></div>
