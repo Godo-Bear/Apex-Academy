@@ -126,7 +126,11 @@ function publicTestsMode(view, host, focusId) {
         ${["All", ...PUBLIC_SUBJECTS].map((s) => `<button type="button" class="notes-chip${publicState.subject === s ? " on" : ""}" data-subject="${s}">${s === "All" ? "All" : `${SUBJECT_ICON[s]} ${s}`}</button>`).join("")}
         <button type="button" class="notes-chip${publicState.mine ? " on" : ""}" data-mine>👤 Mine</button>
       </div>
-      <p class="muted small" style="margin:0;">Want to share your own? Build a test in <b>Pick topics</b> or <b>AI test</b>, then press <b>🌍 Share</b>.</p>
+      <div class="pub-make">
+        <span class="muted small">Want to share your own test?</span>
+        <button class="btn sm" type="button" data-make="pick">＋ Make a public test</button>
+        <button class="btn secondary sm" type="button" data-make="chat">💬 Make one with the AI</button>
+      </div>
     </div>
     <div id="pub-list" class="stack"><p class="muted">Loading public tests…</p></div>`;
 
@@ -159,7 +163,7 @@ function publicTestsMode(view, host, focusId) {
           ${r.user_id === authUser.id || me.isAdmin ? `<button class="btn ghost sm" data-act="delete" type="button">🗑 ${r.user_id === authUser.id ? "Remove" : "Remove (admin)"}</button>` : `<button class="btn ghost sm" data-act="report" type="button">🚩 Report</button>`}
         </div>
       </div>`).join("")
-      : `<div class="card"><p class="muted" style="margin:0;">${rows.length ? "No public tests match that." : "No public tests yet. Be the first — build a test, then press 🌍 Share."}</p></div>`;
+      : `<div class="card"><p class="muted" style="margin:0;">${rows.length ? "No public tests match that." : "No public tests yet. Be the first — press ＋ Make a public test above."}</p></div>`;
   }
 
   async function loadQuestions(id) {
@@ -212,6 +216,10 @@ function publicTestsMode(view, host, focusId) {
     }
   });
 
+  $$("[data-make]", host).forEach((b) => b.addEventListener("click", () => {
+    switchStudyMode(b.dataset.make);
+    toast(b.dataset.make === "pick" ? "Pick your topics, then press 🌍 Make public" : "Ask the AI for questions, then press 🌍 Share");
+  }));
   $("#pub-search", host).addEventListener("input", (e) => { publicState.search = e.target.value; draw(); });
   $("#pub-sort", host).addEventListener("change", (e) => { publicState.sort = e.target.value; draw(); });
   $$(".pub-chips .notes-chip", host).forEach((b) => b.addEventListener("click", () => {

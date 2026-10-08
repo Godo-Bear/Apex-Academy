@@ -854,6 +854,9 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
 
 /* ---------------- Public tests ---------------- */
 .pub-bar { display: flex; gap: 8px; }
+.pub-make { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.t-go { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+@media (max-width: 420px) { .t-go { grid-template-columns: 1fr; } }
 .pub-bar input { flex: 1; min-width: 0; }
 .pub-bar select { width: auto; }
 .pub-chips { display: flex; flex-wrap: wrap; gap: 6px; }

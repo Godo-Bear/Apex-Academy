@@ -1955,7 +1955,11 @@ function pickBuilder(view, host) {
         </div>
       </div>
       <div id="t-error" class="error hidden"></div>
-      <button class="btn block" id="t-start">Start test →</button>
+      <div class="t-go">
+        <button class="btn" id="t-start" type="button">Start test →</button>
+        <button class="btn secondary" id="t-public" type="button">🌍 Make public</button>
+      </div>
+      <p class="muted small" style="margin:0;">“Make public” builds the same test and shares it so everyone can find it in 🌍 Public tests.</p>
     </div>`;
 
   $$("[data-all]", host).forEach((btn) => btn.addEventListener("click", () => {
@@ -1973,7 +1977,10 @@ function pickBuilder(view, host) {
     $("#t-bank", host).style.pointerEvents = examplesOnly.checked ? "none" : "";
   });
 
-  $("#t-start", host).addEventListener("click", async () => {
+  // Builds the test, then either starts it or (share = true) opens the share box.
+  const buildTest = async (share) => {
+    const startBtn = $(share ? "#t-public" : "#t-start", host), label = startBtn.textContent;
+    const go = (items, minutes) => (share ? openShareTest(items, { minutes }) : runTest(view, items, minutes));
     const topicIds = $$("[data-group] input:checked", host).map((b) => b.value);
     const diffs = $$("#t-diff input:checked", host).map((b) => +b.value);
     const count = Math.max(1, Math.min(50, parseInt($("#t-count", host).value, 10) || 10));
@@ -1993,18 +2000,19 @@ function pickBuilder(view, host) {
     }
 
     if (examples || files.length) {
-      const btn = $("#t-start", host);
+      const btn = startBtn;
       btn.disabled = true;
       btn.textContent = "Writing your test…";
       try {
         const topics = filesOnly ? null : topicIds.map(findTopic);
         const qs = await generateAIQuestions(examples, count, topics, diffs.length ? diffs : [1, 2, 3], testFiles);
         if (!qs.length) throw new Error("No usable questions");
-        runTest(view, qs.map((q) => ({ q, topic: { id: null, name: q.topicName, icon: "🤖" } })), minutes);
+        if (share) { btn.disabled = false; btn.textContent = label; }
+        go(qs.map((q) => ({ q, topic: { id: null, name: q.topicName, icon: "🤖" } })), minutes);
       } catch (e) {
         console.error("Apex: AI test generation failed —", e);
         btn.disabled = false;
-        btn.textContent = "Start test →";
+        btn.textContent = label;
         setMsg(err, files.length ? "Couldn't write a test from those files. Try fewer or smaller files, or add an example question." : "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank.", "error");
       }
       return;
@@ -2015,8 +2023,10 @@ function pickBuilder(view, host) {
       return topic.questions.filter((q) => diffs.includes(q.difficulty)).map((q) => ({ q, topic }));
     });
     if (!pool.length) return setMsg(err, "No questions match those choices.", "error");
-    runTest(view, shuffle(pool).slice(0, count), minutes);
-  });
+    go(shuffle(pool).slice(0, count), minutes);
+  };
+  $("#t-start", host).addEventListener("click", () => buildTest(false));
+  $("#t-public", host).addEventListener("click", () => buildTest(true));
 }
 
 const timeOptions = (selected) => `<option value="0"${selected === 0 ? " selected" : ""}>No limit</option>` +
