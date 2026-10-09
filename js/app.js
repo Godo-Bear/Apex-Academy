@@ -413,10 +413,12 @@ async function logout() {
   authUser = null;
   me = null;
   // Shared computers: don't leave this student's AI chats on screen for the next person.
-  tutorLog.length = 0;
+  tutorChatId = null;
+  forgetLocalAIState();
   aiTest.log.length = 0;
   aiTest.draft = [];
   aiTest.types = [];
+  aiTestOwner = null;
   $$(".modal").forEach(hide);
   history.replaceState(null, "", location.pathname);
   showAuthPanel("main");
@@ -537,8 +539,9 @@ function watchForUpdates() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-08a";
+const TERMS_VERSION = "2026-10-09a";
 const TERMS_CHANGES = [
+  "New — AI memory: your AI tutor chats are saved to your account, and the AI can remember short notes about you (like topics you find tricky) to help you next time. You can see, delete or turn this off in Settings.",
   "New — public tests: you can share tests with everyone on Apex Academy. Shared tests show your name (unless you turn it off), must follow the behaviour rules, and can be removed by the site owner.",
   "Access is $10 AUD every 6 months, paid cash in hand to the site owner.",
   "Accounts are unlocked by hand, so it may take a while after paying. No refunds.",
@@ -2311,37 +2314,112 @@ function runTest(view, items, minutes, opts = {}) {
 }
 
 // ---------------- Tutor ----------------
-const tutorLog = []; // kept for the session so switching pages doesn't wipe the chat
+// Chats are saved (js/ai-memory.js), so the tutor sees the earlier messages in a chat, you can go back to
+// old chats, and it remembers short notes about you across all chats.
+let tutorChatId = null; // the chat that was open, so switching pages comes back to it
+const TUTOR_HISTORY = 12; // earlier messages sent with each question
+
+function tutorPrompt(earlier, question, hasPhoto) {
+  const recent = earlier.slice(-TUTOR_HISTORY);
+  const lines = recent.map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.photo ? "[sent a photo] " : ""}${String(m.text).slice(0, 1500)}`);
+  return `You are chatting with a Year 7 student as their tutor.
+${memoryPrompt()}
+${recent.length ? `The conversation so far${earlier.length > recent.length ? " (the most recent messages)" : ""}:\n${lines.join("\n\n")}\n\n` : ""}Student's new message: ${question || "(no words, just the photo)"}${hasPhoto ? `\n(The student attached a photo, which is included.${question ? "" : " Look at their handwritten working and explain whether it's correct, and how to fix it if not."})` : ""}
+
+Answer the student's new message, carrying on naturally from the conversation — they may refer back to earlier messages (like "the second one" or "explain that again"). In the reply write plain text with no Markdown or LaTeX, use × and ÷, and keep it fairly short unless they ask for more detail.
+
+Reply with ONLY valid JSON, no markdown:
+{"reply":"your answer to the student","title":"a 2–5 word title for this chat","remember":[],"forget":[]}
+${memoryRules()}`;
+}
 
 function pageTutor(view) {
-  let pendingImage = null;
+  let pendingImage = null, chats = [], current = null, busy = false;
+  const blankChat = () => ({ id: newChatId(), title: "New chat", messages: [], createdAt: new Date().toISOString() });
   view.innerHTML = `
-    <div class="page-head"><h1>AI Tutor</h1><p>Ask about any school subject — maths, English, science and more — and get a friendly explanation. You can send a photo of your working too.</p></div>
-    <div class="card">
-      <div class="chat" id="chat"></div>
-      <div class="attach-preview hidden" id="attach"><img alt=""><button class="btn ghost sm" id="attach-x">Remove photo</button></div>
-      <form class="chat-form" id="chat-form" autocomplete="off">
-        <button type="button" class="btn secondary" id="photo" title="Add a photo of your working">📷</button>
-        <input type="file" id="photo-input" accept="image/*" class="hidden">
-        <input type="text" id="ask" placeholder="Ask a question…">
-        <button class="btn" type="submit" id="send">Ask</button>
-      </form>
+    <div class="page-head"><h1>AI Tutor</h1><p>Ask about any school subject — maths, English, science and more — and get a friendly explanation. You can send a photo of your working too. Your chats are saved, and the tutor remembers what you've talked about.</p></div>
+    <div class="tutor-wrap">
+      <aside class="card tutor-side" id="t-side" aria-label="Your chats">
+        <button class="btn" type="button" data-new-chat>＋ New chat</button>
+        <div class="tutor-chats" id="t-chats"><p class="muted small" style="margin:0;">Loading your chats…</p></div>
+        <button class="btn ghost sm" type="button" id="t-mem">🧠 What the AI remembers</button>
+      </aside>
+      <div class="card tutor-main">
+        <div class="tutor-bar">
+          <button class="btn ghost sm tutor-toggle" type="button" id="t-toggle" aria-expanded="false" aria-controls="t-side">☰ Chats</button>
+          <strong class="tutor-title" id="t-title"></strong>
+          <button class="btn ghost sm tutor-new" type="button" data-new-chat title="Start a new chat">＋ New</button>
+        </div>
+        <div class="chat" id="chat"><p class="muted small" style="margin:auto;">Loading your chats…</p></div>
+        <div class="attach-preview hidden" id="attach"><img alt=""><button class="btn ghost sm" id="attach-x">Remove photo</button></div>
+        <form class="chat-form" id="chat-form" autocomplete="off">
+          <button type="button" class="btn secondary" id="photo" title="Add a photo of your working">📷</button>
+          <input type="file" id="photo-input" accept="image/*" class="hidden">
+          <input type="text" id="ask" placeholder="Ask a question…" maxlength="4000">
+          <button class="btn" type="submit" id="send">Ask</button>
+        </form>
+      </div>
     </div>`;
 
-  const chat = $("#chat", view);
+  const chatBox = $("#chat", view), side = $("#t-side", view), send = $("#send", view);
   const draw = () => {
-    if (!tutorLog.length) {
+    if (!current) return;
+    $("#t-title", view).textContent = current.title;
+    if (!current.messages.length) {
       const examples = ["How do I simplify 12/18?", "What's the difference between their, there and they're?", "How do I find the area of a triangle?"];
-      chat.innerHTML = `<div class="chat-empty">What would you like help with?
+      const welcome = aiMemory?.enabled && aiMemory.items.length ? "Welcome back! What would you like help with today?" : "What would you like help with?";
+      chatBox.innerHTML = `<div class="chat-empty">${welcome}
         <div class="chips">${examples.map((x) => `<button type="button" class="btn secondary sm">${esc(x)}</button>`).join("")}</div></div>`;
-      $$(".chips button", chat).forEach((b) => b.addEventListener("click", () => { $("#ask", view).value = b.textContent; $("#chat-form", view).requestSubmit(); }));
+      $$(".chips button", chatBox).forEach((b) => b.addEventListener("click", () => { $("#ask", view).value = b.textContent; $("#chat-form", view).requestSubmit(); }));
       return;
     }
-    chat.innerHTML = tutorLog.map((m) =>
-      `<div class="bubble ${m.role}">${m.image ? `<img src="${m.image}" alt="Your photo">` : ""}${esc(m.text)}</div>`).join("");
-    chat.scrollTop = chat.scrollHeight;
+    chatBox.innerHTML = current.messages.map((m) => `<div class="bubble ${m.role}${m.pending ? " pending" : ""}">${m.image ? `<img src="${m.image}" alt="Your photo">` : m.photo ? `<span class="bubble-photo">📷 Photo</span>` : ""}${esc(m.text)}${m.note ? `<div class="bubble-note">${esc(m.note)}</div>` : ""}</div>`).join("");
+    chatBox.scrollTop = chatBox.scrollHeight;
   };
-  draw();
+  const drawList = () => {
+    const list = $("#t-chats", view);
+    const saved = chats.filter((c) => c.messages.length);
+    list.innerHTML = saved.length
+      ? saved.map((c) => `<div class="tutor-chat${c === current ? " on" : ""}">
+          <button type="button" class="tutor-chat-open" data-chat-id="${esc(c.id)}"><span>${esc(c.title)}</span><span class="muted small">${c.updatedAt ? fmtDate(c.updatedAt) : "Now"}</span></button>
+          <button type="button" class="btn ghost sm" data-del-chat="${esc(c.id)}" aria-label="Delete this chat" title="Delete this chat">✕</button>
+        </div>`).join("")
+      : `<p class="muted small" style="margin:0;">Your chats will show here, so you can go back to them.</p>`;
+    const n = aiMemory?.enabled ? aiMemory.items.length : 0;
+    $("#t-mem", view).textContent = `🧠 What the AI remembers${n ? ` (${n})` : ""}`;
+  };
+  const toggleSide = (open) => { side.classList.toggle("open", open); $("#t-toggle", view).setAttribute("aria-expanded", String(open)); };
+  function openChat(chat) {
+    current = chat;
+    tutorChatId = chat.id;
+    draw(); drawList();
+    toggleSide(false);
+  }
+
+  $("#t-toggle", view).addEventListener("click", () => toggleSide(!side.classList.contains("open")));
+  $$("[data-new-chat]", view).forEach((b) => b.addEventListener("click", () => {
+    if (!current) return;
+    openChat(current.messages.length ? blankChat() : current);
+    $("#ask", view).focus();
+  }));
+  $("#t-chats", view).addEventListener("click", async (e) => {
+    const del = e.target.closest("[data-del-chat]");
+    if (del) {
+      const chat = chats.find((c) => c.id === del.dataset.delChat);
+      if (!chat || !confirm(`Delete "${chat.title}"? This can't be undone.`)) return;
+      chats = chats.filter((c) => c !== chat);
+      await deleteChat(chat.id);
+      if (chat === current) openChat(blankChat()); else drawList();
+      toast("Chat deleted");
+      return;
+    }
+    const pick = e.target.closest("[data-chat-id]");
+    if (pick) openChat(chats.find((c) => c.id === pick.dataset.chatId) || current);
+  });
+  $("#t-mem", view).addEventListener("click", () => openMemoryModal({
+    onChange: drawList,
+    onChatsDeleted: () => { chats = []; openChat(blankChat()); },
+  }));
 
   $("#photo", view).addEventListener("click", () => $("#photo-input", view).click());
   $("#photo-input", view).addEventListener("change", (e) => {
@@ -2364,27 +2442,50 @@ function pageTutor(view) {
     e.preventDefault();
     const input = $("#ask", view);
     const question = input.value.trim();
-    if (!question && !pendingImage) return;
-    const image = pendingImage;
-    tutorLog.push({ role: "me", text: question || "Can you check my working?", image: image?.base64 });
-    tutorLog.push({ role: "bot", text: "Thinking…" });
+    if (!current || busy || (!question && !pendingImage)) return;
+    const image = pendingImage, chat = current; // the student may switch chats while the tutor is thinking
+    const earlier = chat.messages.filter((m) => !m.pending && m.role !== "err");
+    chat.messages.push({ role: "me", text: question || "Can you check my working?", image: image?.base64, photo: !!image });
+    const pending = { role: "bot", text: "Thinking…", pending: true };
+    chat.messages.push(pending);
+    if (!chats.includes(chat)) chats.unshift(chat);
+    busy = true; send.disabled = true;
     input.value = "";
     clearImage();
-    draw();
-    const send = $("#send", view);
-    send.disabled = true;
+    draw(); drawList();
 
-    const body = { question: question || "Please look at the photo of my handwritten working and explain whether it's correct, and how to fix it if not." };
-    if (image) { body.image = image.base64; body.imageMimeType = image.mimeType; }
-    const pending = tutorLog[tutorLog.length - 1];
     try {
-      pending.text = await askTutor(body);
+      await loadMemory();
+      const body = { question: tutorPrompt(earlier, question, !!image) };
+      if (image) { body.image = image.base64; body.imageMimeType = image.mimeType; }
+      const raw = await askTutorRaw(body);
+      const data = parseLooseJSON(raw);
+      const obj = data && !Array.isArray(data) ? data : {};
+      pending.text = cleanTutorAnswer(aiReplyText(raw, data)) || "Sorry, I couldn't come up with an answer. Try asking another way.";
+      if (chat.title === "New chat") chat.title = plainText(obj.title || "").slice(0, 50) || (question || "Checking my working").slice(0, 50);
+      const note = memoryNote(applyMemoryUpdates(obj));
+      if (note) pending.note = note;
     } catch (err) {
       console.error(err);
       pending.role = "err";
       pending.text = "Sorry, I couldn't reach the tutor. Please try again in a moment.";
     }
-    if (document.body.contains(chat)) { draw(); send.disabled = false; input.focus(); }
+    delete pending.pending;
+    saveChat(chat);
+    chats.sort((a, b) => (a === chat ? -1 : b === chat ? 1 : 0));
+    busy = false;
+    if (document.body.contains(chatBox)) {
+      send.disabled = false;
+      if (chat === current) { draw(); input.focus(); }
+      drawList();
+    }
+  });
+
+  Promise.all([listChats(), loadMemory()]).then(([all]) => {
+    if (!document.body.contains(chatBox)) return;
+    chats = all;
+    // Come back to the chat that was open, or carry on the most recent one.
+    openChat((tutorChatId ? chats.find((c) => c.id === tutorChatId) : chats[0]) || blankChat());
   });
 }
 
@@ -2557,6 +2658,9 @@ function pageSettings(view) {
       </label>
     </div>
 
+    <div class="section-label">AI memory</div>
+    <div class="card stack" id="set-memory">${memoryManagerHTML()}</div>
+
     <div class="section-label">Feedback</div>
     <div class="card stack" id="set-feedback">
       <p class="muted small" style="margin:0;">Found a bug, have an idea, or a question? Send it to the site owner. Replies show up below.</p>
@@ -2587,6 +2691,8 @@ function pageSettings(view) {
       </div>
       <button class="btn secondary" id="set-logout" style="align-self:flex-start;">⏻ Log out</button>
     </div>`;
+
+  wireMemoryManager($("#set-memory", view), { onChatsDeleted: () => { tutorChatId = null; } });
 
   // segmented choices
   $$("[data-choice]", view).forEach((group) => group.addEventListener("click", (e) => {

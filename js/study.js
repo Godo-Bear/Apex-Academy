@@ -101,7 +101,26 @@ function questionIcon(q) {
   return q.visual ? "🖼️" : "✏️";
 }
 
+// The AI test chat and draft are saved on this device, so they're still there next time.
+let aiTestOwner = null;
+const aiTestKey = () => `apex-aitest-${authUser.id}`;
+function loadAITest() {
+  if (aiTestOwner === authUser.id) return;
+  aiTestOwner = authUser.id;
+  const saved = store(aiTestKey());
+  if (!saved) return;
+  aiTest.log.splice(0, aiTest.log.length, ...(Array.isArray(saved.log) ? saved.log.filter((m) => !m.pending) : []));
+  aiTest.draft = Array.isArray(saved.draft) ? saved.draft : [];
+  aiTest.minutes = Number.isFinite(saved.minutes) ? saved.minutes : 20;
+  aiTest.types = Array.isArray(saved.types) ? saved.types : [];
+}
+function saveAITest() {
+  if (aiTestOwner !== authUser?.id) return;
+  store(aiTestKey(), { log: aiTest.log.filter((m) => !m.pending).slice(-40), draft: aiTest.draft, minutes: aiTest.minutes, types: aiTest.types });
+}
+
 function aiTestMode(view, host) {
+  loadAITest();
   host.innerHTML = `
     <div class="card stack">
       <p class="muted small" style="margin:0;">Tell the AI what to test you on — any subject (maths, English, science, history…), what types of questions, and how hard. It writes them straight into your test below, and you can keep chatting to add more or change them.</p>
@@ -114,7 +133,7 @@ function aiTestMode(view, host) {
     <div class="card stack" id="tc-draft"></div>`;
 
   wireUploadBox($("#tc-files", host), aiTest.files);
-  $("#tc-types", host).addEventListener("change", () => { aiTest.types = $$("#tc-types input:checked", host).map((b) => b.value); });
+  $("#tc-types", host).addEventListener("change", () => { aiTest.types = $$("#tc-types input:checked", host).map((b) => b.value); saveAITest(); });
 
   const summary = () => (aiTest.draft.length
     ? `The test so far has ${aiTest.draft.length} questions:\n${aiTest.draft.map((q, i) => `${i + 1}. [${questionKind(q)}] ${q.prompt.slice(0, 140)} (${q.topicName})`).join("\n")}`
@@ -130,8 +149,9 @@ function aiTestMode(view, host) {
       const types = aiTest.types.map((k) => AI_TEST_TYPES[k]);
       const history = chatHistory(aiTest.log.slice(0, -2));
       if (aiTest.files.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
+      await loadMemory();
       const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) building a practice test WITH a student in a chat. The test can be on ANY school subject or topic: maths, English, science, history, geography, health, languages, digital technologies, general knowledge, or anything school-appropriate they're interested in.
-
+${memoryPrompt()}
 ${summary()}
 ${types.length ? `The student ticked these question types: ${types.join(", ")}. Use them.\n` : ""}
 What to do:
@@ -147,7 +167,8 @@ ${AI_QUESTION_RULES}
 ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}${hidden ? `\n\n(Extra information for you, from the student's info page:\n${hidden})` : ""}
 
 Reply with ONLY valid JSON, no markdown:
-{"reply":"a short friendly message (under 60 words) saying what you did","add":[question objects],"remove":[question numbers],"clear":false}`, aiTest.files,
+{"reply":"a short friendly message (under 60 words) saying what you did","add":[question objects],"remove":[question numbers],"clear":false,"remember":[],"forget":[]}
+${memoryRules()}`, aiTest.files,
         "The student has uploaded files for this test. Unless they ask for something else, base the questions on this material. If it contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style, format and level rather than copying them. You can use passages from the files as reading passages."));
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
@@ -159,7 +180,7 @@ Reply with ONLY valid JSON, no markdown:
       const list = Array.isArray(data) ? data : obj.add || obj.questions || [];
       const added = normaliseAIQuestions(list, 15).slice(0, Math.max(0, 50 - aiTest.draft.length));
       aiTest.draft.push(...added);
-      const note = [added.length ? `✓ Added ${added.length} question${added.length === 1 ? "" : "s"}` : "", removed ? `Removed ${removed}` : ""].filter(Boolean).join(" · ");
+      const note = [added.length ? `✓ Added ${added.length} question${added.length === 1 ? "" : "s"}` : "", removed ? `Removed ${removed}` : "", memoryNote(applyMemoryUpdates(obj))].filter(Boolean).join(" · ");
       const reply = aiReplyText(raw, data);
       return { text: reply || (added.length ? "Here are your questions — have a look below!" : "Okay!"), note };
     },
@@ -167,6 +188,7 @@ Reply with ONLY valid JSON, no markdown:
 
   function drawDraft() {
     const d = $("#tc-draft", host);
+    saveAITest();
     if (!d) return;
     const qs = aiTest.draft;
     d.innerHTML = `
@@ -185,7 +207,7 @@ Reply with ONLY valid JSON, no markdown:
       ${aiTest.log.length || qs.length ? `<button class="btn ghost sm" id="tc-reset" type="button" style="justify-self:start;">Start over (clear the chat and test)</button>` : ""}`;
     $$("[data-x]", d).forEach((b) => b.addEventListener("click", () => { aiTest.draft.splice(+b.dataset.x, 1); drawDraft(); }));
     $("#tc-clear", d)?.addEventListener("click", () => { if (confirm("Remove all the questions from this test?")) { aiTest.draft = []; drawDraft(); } });
-    $("#tc-time", d).addEventListener("change", (e) => { aiTest.minutes = +e.target.value; });
+    $("#tc-time", d).addEventListener("change", (e) => { aiTest.minutes = +e.target.value; saveAITest(); });
     $("#tc-share", d).addEventListener("click", () => openShareTest(aiTest.draft.map((q) => ({ q, topic: { id: null, name: q.topicName } })), { minutes: aiTest.minutes, title: aiTest.draft[0]?.topicName || "" }));
     $("#tc-reset", d)?.addEventListener("click", () => {
       if (!confirm("Clear the chat and the test, and start again?")) return;
@@ -525,8 +547,9 @@ function flashcardsMode(view, host) {
       const history = chatHistory(state.chat.slice(0, -2));
       const listCards = deck.cards.slice(0, 60).map((c, i) => `${i + 1}. ${c.f.slice(0, 90)} → ${c.b.slice(0, 90)}`).join("\n");
       if (studyFiles.cards.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
+      await loadMemory();
       const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student make and study flashcards, in a chat. Flashcards can be on ANY school subject or topic.
-
+${memoryPrompt()}
 ${deck.cards.length ? `The current deck "${deck.name}" has ${deck.cards.length} cards:\n${listCards}` : `The current deck${deck.name !== "New deck" ? ` ("${deck.name}")` : ""} is empty.`}
 
 What to do:
@@ -540,7 +563,8 @@ What to do:
 ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}${hidden ? `\n\n(Extra information for you, from the student's info page:\n${hidden})` : ""}
 
 Reply with ONLY valid JSON, no markdown:
-{"reply":"a short friendly message (under 50 words)","newDeck":false,"name":"","add":[{"front":"...","back":"..."}],"remove":[card numbers]}`, studyFiles.cards,
+{"reply":"a short friendly message (under 50 words)","newDeck":false,"name":"","add":[{"front":"...","back":"..."}],"remove":[card numbers],"remember":[],"forget":[]}
+${memoryRules()}`, studyFiles.cards,
         "The student uploaded files for their flashcards. Unless they ask for something else, make the cards from the key words, facts and ideas in this material (in your own short words)."));
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
@@ -565,6 +589,8 @@ Reply with ONLY valid JSON, no markdown:
       if (firstOwn < 0) deck.cards.push(...fresh);
       else { deck.cards.splice(firstOwn, 0, ...fresh); fcView.deckId = null; } // AI cards go before your own ones
       if (fresh.length) notes.push(`✓ Added ${fresh.length} card${fresh.length === 1 ? "" : "s"} to “${deck.name}”`);
+      const remembered = memoryNote(applyMemoryUpdates(obj));
+      if (remembered) notes.push(remembered);
       resetView(!wasEmpty);
       return { text: aiReplyText(raw, data) || (fresh.length ? "Here are your flashcards!" : "Okay!"), note: notes.join(" · ") };
     },
@@ -731,8 +757,9 @@ function infoMode(view, host) {
       const history = chatHistory(state.chat.slice(0, -2));
       const current = page ? `The student's current page is "${page.title}", with these sections: ${page.sections.map((s) => s.heading).join("; ")}.` : "There's no page yet.";
       if (studyFiles.info.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
+      await loadMemory();
       const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) making an interactive info page WITH a student, in a chat. It can be about ANY school-appropriate subject or topic: facts about something, how something works, a summary of a school topic, or ideas (for a project, story, essay, experiment or presentation).
-
+${memoryPrompt()}
 ${current}
 
 What to do:
@@ -745,7 +772,8 @@ What to do:
 ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}
 
 Reply with ONLY valid JSON, no markdown:
-{"reply":"a short message (under 50 words)","mode":"new","page":{"title":"...","intro":"1–2 sentences","sections":[{"heading":"...","points":["..."]}],"terms":[{"term":"...","meaning":"..."}],"facts":["..."],"quiz":[{"q":"...","options":["...","...","...","..."],"answer":"..."}]}}`, studyFiles.info,
+{"reply":"a short message (under 50 words)","mode":"new","page":{"title":"...","intro":"1–2 sentences","sections":[{"heading":"...","points":["..."]}],"terms":[{"term":"...","meaning":"..."}],"facts":["..."],"quiz":[{"q":"...","options":["...","...","...","..."],"answer":"..."}]},"remember":[],"forget":[]}
+${memoryRules()}`, studyFiles.info,
         "The student uploaded files. Use this material for the page: summarise it, explain it, or answer their questions about it, as they ask."));
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
@@ -768,7 +796,8 @@ Reply with ONLY valid JSON, no markdown:
           note = `📄 New page: “${page.title}”`;
         }
       }
-      return { text: aiReplyText(raw, data) || (note ? "Here you go!" : "Okay!"), note };
+      const remembered = memoryNote(applyMemoryUpdates(obj));
+      return { text: aiReplyText(raw, data) || (note ? "Here you go!" : "Okay!"), note: [note, remembered].filter(Boolean).join(" · ") };
     },
   });
 
