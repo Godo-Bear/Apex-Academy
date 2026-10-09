@@ -149,9 +149,9 @@ function aiTestMode(view, host) {
       const types = aiTest.types.map((k) => AI_TEST_TYPES[k]);
       const history = chatHistory(aiTest.log.slice(0, -2));
       if (aiTest.files.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
-      await loadMemory();
+      await Promise.all([loadMemory(), ensureCalendar()]);
       const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) building a practice test WITH a student in a chat. The test can be on ANY school subject or topic: maths, English, science, history, geography, health, languages, digital technologies, general knowledge, or anything school-appropriate they're interested in.
-${memoryPrompt()}
+${calendarPrompt()}${memoryPrompt()}
 ${summary()}
 ${types.length ? `The student ticked these question types: ${types.join(", ")}. Use them.\n` : ""}
 What to do:
@@ -547,9 +547,9 @@ function flashcardsMode(view, host) {
       const history = chatHistory(state.chat.slice(0, -2));
       const listCards = deck.cards.slice(0, 60).map((c, i) => `${i + 1}. ${c.f.slice(0, 90)} → ${c.b.slice(0, 90)}`).join("\n");
       if (studyFiles.cards.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
-      await loadMemory();
+      await Promise.all([loadMemory(), ensureCalendar()]);
       const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student make and study flashcards, in a chat. Flashcards can be on ANY school subject or topic.
-${memoryPrompt()}
+${calendarPrompt()}${memoryPrompt()}
 ${deck.cards.length ? `The current deck "${deck.name}" has ${deck.cards.length} cards:\n${listCards}` : `The current deck${deck.name !== "New deck" ? ` ("${deck.name}")` : ""} is empty.`}
 
 What to do:
@@ -757,9 +757,9 @@ function infoMode(view, host) {
       const history = chatHistory(state.chat.slice(0, -2));
       const current = page ? `The student's current page is "${page.title}", with these sections: ${page.sections.map((s) => s.heading).join("; ")}.` : "There's no page yet.";
       if (studyFiles.info.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
-      await loadMemory();
+      await Promise.all([loadMemory(), ensureCalendar()]);
       const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) making an interactive info page WITH a student, in a chat. It can be about ANY school-appropriate subject or topic: facts about something, how something works, a summary of a school topic, or ideas (for a project, story, essay, experiment or presentation).
-${memoryPrompt()}
+${calendarPrompt()}${memoryPrompt()}
 ${current}
 
 What to do:

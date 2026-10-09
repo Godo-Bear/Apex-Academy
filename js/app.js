@@ -415,6 +415,8 @@ async function logout() {
   // Shared computers: don't leave this student's AI chats on screen for the next person.
   tutorChatId = null;
   forgetLocalAIState();
+  forgetLocalCalendar();
+  calView.month = calView.day = null;
   aiTest.log.length = 0;
   aiTest.draft = [];
   aiTest.types = [];
@@ -486,7 +488,7 @@ async function loadCustomQuestions() {
 
 // ---------------- App shell & routing ----------------
 function enterApp() {
-  const items = [...NAV, { route: "notes", label: "My notes", icon: "🗒️" }, ...(me.isAdmin ? [{ route: "admin", label: "Admin", icon: "🛠" }] : [])];
+  const items = [...NAV, { route: "notes", label: "Notes & calendar", icon: "🗓️" }, ...(me.isAdmin ? [{ route: "admin", label: "Admin", icon: "🛠" }] : [])];
   $("#nav").innerHTML = items.map((n) =>
     `<a class="nav-link" href="#/${n.route}" data-route="${n.route}"><span class="ico">${n.icon}</span><span>${n.label}</span></a>`).join("");
   $("#tabbar").innerHTML = NAV.map((n) =>
@@ -539,8 +541,9 @@ function watchForUpdates() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-09a";
+const TERMS_VERSION = "2026-10-09b";
 const TERMS_CHANGES = [
+  "New — calendar: put your tests, assignments and reminders on the calendar (Notes & calendar). It's saved to your account, and the AI can see what's coming up so it can help you prepare (you can turn this off).",
   "New — AI memory: your AI tutor chats are saved to your account, and the AI can remember short notes about you (like topics you find tricky) to help you next time. You can see, delete or turn this off in Settings.",
   "New — public tests: you can share tests with everyone on Apex Academy. Shared tests show your name (unless you turn it off), must follow the behaviour rules, and can be removed by the site owner.",
   "Access is $10 AUD every 6 months, paid cash in hand to the site owner.",
@@ -566,6 +569,7 @@ function showLoginNotices() {
       queue.push((next) => { store(shownKey, todayStr()); showRenewReminder(daysLeft, next); });
     }
   }
+  queue.push((next) => showComingUp(next));
   const run = () => { const fn = queue.shift(); if (fn) fn(run); };
   run();
 }
@@ -738,7 +742,7 @@ function route() {
   const navRoute = pages[page] ? page : "home";
   $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === navRoute));
   view.innerHTML = "";
-  view.closest("main").classList.remove("with-notes");
+  view.closest("main").classList.remove("with-notes", "wide");
   render(view, arg, arg2);
   window.scrollTo(0, 0);
 }
@@ -789,6 +793,8 @@ function pageHome(view) {
     </div>
     <div style="margin-top:12px;">${rankCard()}</div>
 
+    <div id="home-cal" style="margin-top:12px;"></div>
+
     <div class="section-label">Suggested next</div>
     <div class="card suggest">
       <div class="row" style="gap:14px;">
@@ -810,6 +816,8 @@ function pageHome(view) {
       ${quickCard("#/tutor", "🤖", "Ask the tutor", "Stuck? Get a friendly explanation.")}
     </div>
   `;
+
+  homeCalendarCard($("#home-cal", view));
 
   // Top 5, plus your own place if you're further down.
   loadLeaderboard().then((rows) => {
@@ -2323,14 +2331,15 @@ function tutorPrompt(earlier, question, hasPhoto) {
   const recent = earlier.slice(-TUTOR_HISTORY);
   const lines = recent.map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.photo ? "[sent a photo] " : ""}${String(m.text).slice(0, 1500)}`);
   return `You are chatting with a Year 7 student as their tutor.
-${memoryPrompt()}
+${calendarPrompt()}${memoryPrompt()}
 ${recent.length ? `The conversation so far${earlier.length > recent.length ? " (the most recent messages)" : ""}:\n${lines.join("\n\n")}\n\n` : ""}Student's new message: ${question || "(no words, just the photo)"}${hasPhoto ? `\n(The student attached a photo, which is included.${question ? "" : " Look at their handwritten working and explain whether it's correct, and how to fix it if not."})` : ""}
 
 Answer the student's new message, carrying on naturally from the conversation — they may refer back to earlier messages (like "the second one" or "explain that again"). In the reply write plain text with no Markdown or LaTeX, use × and ÷, and keep it fairly short unless they ask for more detail.
 
 Reply with ONLY valid JSON, no markdown:
-{"reply":"your answer to the student","title":"a 2–5 word title for this chat","remember":[],"forget":[]}
-${memoryRules()}`;
+{"reply":"your answer to the student","title":"a 2–5 word title for this chat","remember":[],"forget":[],"calendar":[]}
+${memoryRules()}
+${calendarRules()}`;
 }
 
 function pageTutor(view) {
@@ -2455,7 +2464,7 @@ function pageTutor(view) {
     draw(); drawList();
 
     try {
-      await loadMemory();
+      await Promise.all([loadMemory(), ensureCalendar()]);
       const body = { question: tutorPrompt(earlier, question, !!image) };
       if (image) { body.image = image.base64; body.imageMimeType = image.mimeType; }
       const raw = await askTutorRaw(body);
@@ -2463,7 +2472,7 @@ function pageTutor(view) {
       const obj = data && !Array.isArray(data) ? data : {};
       pending.text = cleanTutorAnswer(aiReplyText(raw, data)) || "Sorry, I couldn't come up with an answer. Try asking another way.";
       if (chat.title === "New chat") chat.title = plainText(obj.title || "").slice(0, 50) || (question || "Checking my working").slice(0, 50);
-      const note = memoryNote(applyMemoryUpdates(obj));
+      const note = [memoryNote(applyMemoryUpdates(obj)), calendarNote(addEventsFromAI(obj.calendar))].filter(Boolean).join(" · ");
       if (note) pending.note = note;
     } catch (err) {
       console.error(err);
@@ -2484,8 +2493,10 @@ function pageTutor(view) {
   Promise.all([listChats(), loadMemory()]).then(([all]) => {
     if (!document.body.contains(chatBox)) return;
     chats = all;
+    const message = takeTutorMessage(); // e.g. "Help me make a study plan…" from the calendar
     // Come back to the chat that was open, or carry on the most recent one.
-    openChat((tutorChatId ? chats.find((c) => c.id === tutorChatId) : chats[0]) || blankChat());
+    openChat(message ? blankChat() : (tutorChatId ? chats.find((c) => c.id === tutorChatId) : chats[0]) || blankChat());
+    if (message) { $("#ask", view).value = message; $("#chat-form", view).requestSubmit(); }
   });
 }
 

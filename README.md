@@ -19,7 +19,8 @@ It uses the same Supabase project, so existing accounts, points and progress car
 | `js/uploads.js` | File uploads for making tests: reads PDFs, Word, PowerPoint, text and photos in the browser and sends their text and pictures to the AI |
 | `js/public-tests.js` | Public tests: share a test so everyone can find and take it (the `public_tests` table — run `supabase/public-tests.sql`); bank questions are shared by reference, AI questions are cleaned when opened |
 | `js/ai-memory.js` | AI memory: saved AI tutor chats (the tutor sees earlier messages, and you can go back to old chats) and short notes the AI remembers about each student, used by every AI chat; managed in Settings (the `ai_chats` and `ai_memory` tables — run `supabase/ai-memory.sql`), with a device-only fallback |
-| `js/notes.js` | My notes: named notes for each topic, in a panel next to the questions and on the My notes page (saved to the `notes` table — run `supabase/notes.sql` — with a copy on the device) |
+| `js/calendar.js` | Calendar on the Notes & calendar page: tests, assignments, reminders and notes by date, "Quick add" with the AI, practice test / flashcards / study plan buttons, a "Coming up" pop-up at log-in and card on Home; the AI sees what's coming up (the `calendar_events` table — run `supabase/calendar.sql`), with a device-only fallback |
+| `js/notes.js` | My notes: named notes for each topic, in a panel next to the questions and on the Notes & calendar page (saved to the `notes` table — run `supabase/notes.sql` — with a copy on the device) |
 | `js/bank.js` | Upgrades to the question bank: tap-to-answer choices, diagrams on existing questions, new interactive questions, and the Cartesian Plane topic |
 | `js/study.js` | The Test page's AI modes: AI test chat, flashcards, and info & ideas pages |
 | `js/app.js` | App logic: auth, routing, pages, Supabase sync |

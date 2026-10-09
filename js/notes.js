@@ -1,5 +1,6 @@
 /* My notes: students keep as many notes as they like for each topic, each with its own name.
-   The notes panel sits next to the questions on every topic page, and the My notes page lists them all.
+   The notes panel sits next to the questions on every topic page, and the Notes & calendar page lists them all
+   (the calendar itself is in js/calendar.js).
    Notes are saved to the Supabase "notes" table (supabase/notes.sql) with a copy on this device,
    so they still work (on this device only) if the table hasn't been set up.
    Uses helpers from app.js ($, $$, esc, store, toast, sb, authUser, ALL_TOPICS, findTopic), which exist by the time these run. */
@@ -203,11 +204,30 @@ function wireNotesPanel(view, topic) {
   return editor;
 }
 
-// ---------------------------------------------------------------- My notes page
-function pageNotes(view) {
+// ---------------------------------------------------------------- Notes & calendar page
+// #/notes/calendar or #/notes/notes opens that tab; otherwise the last one you used.
+function pageNotes(view, tab) {
+  const want = ["calendar", "notes"].includes(tab) ? tab : store("apex-notes-tab") === "notes" ? "notes" : "calendar";
   view.innerHTML = `
-    <div class="page-head"><h1>📝 My notes</h1><p>Notes for every topic, each with its own name. You can also open them next to the questions on any topic page.</p></div>
-    <div class="card">${notesEditorHTML("all")}</div>`;
+    <div class="page-head"><h1>🗓️ Notes &amp; calendar</h1><p>Put your tests, assignments and reminders on the calendar to get reminders and help from the AI — and keep notes for every topic.</p></div>
+    <div class="segmented" id="nt-tabs" role="tablist" style="margin-bottom:16px;">
+      <button type="button" role="tab" data-tab="calendar">📅 Calendar</button>
+      <button type="button" role="tab" data-tab="notes">📝 Notes</button>
+    </div>
+    <div id="nt-calendar"></div>
+    <div id="nt-notes" class="card">${notesEditorHTML("all")}</div>`;
+  view.closest("main").classList.add("wide");
   const editor = wireNotesEditor(view, { mode: "all" });
+  let calendarReady = false;
+  const open = (t) => {
+    store("apex-notes-tab", t);
+    $$("#nt-tabs button", view).forEach((b) => { const on = b.dataset.tab === t; b.classList.toggle("active", on); b.setAttribute("aria-selected", String(on)); });
+    $("#nt-calendar", view).classList.toggle("hidden", t !== "calendar");
+    $("#nt-notes", view).classList.toggle("hidden", t !== "notes");
+    if (t === "calendar" && !calendarReady) { calendarReady = true; wireCalendar($("#nt-calendar", view)); }
+    if (t !== "notes") editor.flush();
+  };
+  $$("#nt-tabs button", view).forEach((b) => b.addEventListener("click", () => open(b.dataset.tab)));
+  open(want);
   cleanup = () => editor.flush();
 }
