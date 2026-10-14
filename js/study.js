@@ -19,7 +19,8 @@ const chatHistory = (log, n = 10) => log.filter((m) => m.role !== "err" && !m.pe
   .map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.text}`).join("\n");
 const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-// A chat box. onSend(text, hidden) resolves to { text, note } (or throws). `hidden` is extra context for the AI only.
+// A chat box. onSend(text, hidden, progress) resolves to { text, note } (or throws). `hidden` is extra context for
+// the AI only; pass `progress` to askTutorRaw so the "Thinking…" bubble says when it's trying again.
 function chatPanel(host, { log, placeholder, empty, ideas = [], onSend, onChange }) {
   host.innerHTML = `
     <div class="chat study-chat" data-chat></div>
@@ -49,15 +50,19 @@ function chatPanel(host, { log, placeholder, empty, ideas = [], onSend, onChange
     log.push(pending);
     input.value = "";
     draw();
+    const say = (t) => { if (pending.pending) { pending.text = t; if (document.body.contains(box)) draw(); } };
+    const slow = setTimeout(() => say("Still working on it… (big requests can take up to a minute)"), 15000);
     try {
-      const r = await onSend(text, hidden);
+      const r = await onSend(text, hidden, { onRetry: (n) => say(`The AI is busy — trying again (${n + 1} of ${AI_TRIES})…`) });
       pending.text = r?.text || "Done!";
       if (r?.note) pending.note = r.note;
     } catch (e) {
       console.error("Apex: study chat failed —", e);
       pending.role = "err";
-      pending.text = e.userMessage || "Sorry, I couldn't reach the AI. Please try again in a moment.";
+      // Errors from askTutorRaw say what went wrong; anything else was a problem reading the AI's answer.
+      pending.text = e.userMessage || "Something went wrong reading the AI's answer. Please try again.";
     }
+    clearTimeout(slow);
     delete pending.pending;
     while (log.length > 40) log.shift();
     busy = false;
@@ -145,7 +150,7 @@ function aiTestMode(view, host) {
     empty: "What do you want to be tested on?",
     ideas: ["10 questions on fractions and decimals", "Science quiz on the solar system", "Plot points on the Cartesian plane", "A reading passage with questions", "History: ancient Egypt, mixed types", "Spot the mistake in grammar sentences"],
     onChange: drawDraft,
-    async onSend(text, hidden) {
+    async onSend(text, hidden, progress) {
       const types = aiTest.types.map((k) => AI_TEST_TYPES[k]);
       const history = chatHistory(aiTest.log.slice(0, -2));
       if (aiTest.files.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
@@ -169,7 +174,7 @@ ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}${hidden ? `\n\n
 Reply with ONLY valid JSON, no markdown:
 {"reply":"a short friendly message (under 60 words) saying what you did","add":[question objects],"remove":[question numbers],"clear":false,"remember":[],"forget":[]}
 ${memoryRules()}`, aiTest.files,
-        "The student has uploaded files for this test. Unless they ask for something else, base the questions on this material. If it contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style, format and level rather than copying them. You can use passages from the files as reading passages."));
+        "The student has uploaded files for this test. Unless they ask for something else, base the questions on this material. If it contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style, format and level rather than copying them. You can use passages from the files as reading passages."), progress);
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
       const before = aiTest.draft.length;
@@ -543,7 +548,7 @@ function flashcardsMode(view, host) {
     empty: "Tell the AI what flashcards to make — any subject. You can keep asking for more, or ask it to explain a card.",
     ideas: ["Make 10 flashcards on the water cycle", "Key terms for fractions", "French greetings", "Explain a card I'm stuck on"],
     onChange: () => { save(); draw(); },
-    async onSend(text, hidden) {
+    async onSend(text, hidden, progress) {
       const history = chatHistory(state.chat.slice(0, -2));
       const listCards = deck.cards.slice(0, 60).map((c, i) => `${i + 1}. ${c.f.slice(0, 90)} → ${c.b.slice(0, 90)}`).join("\n");
       if (studyFiles.cards.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
@@ -565,7 +570,7 @@ ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}${hidden ? `\n\n
 Reply with ONLY valid JSON, no markdown:
 {"reply":"a short friendly message (under 50 words)","newDeck":false,"name":"","add":[{"front":"...","back":"..."}],"remove":[card numbers],"remember":[],"forget":[]}
 ${memoryRules()}`, studyFiles.cards,
-        "The student uploaded files for their flashcards. Unless they ask for something else, make the cards from the key words, facts and ideas in this material (in your own short words)."));
+        "The student uploaded files for their flashcards. Unless they ask for something else, make the cards from the key words, facts and ideas in this material (in your own short words)."), progress);
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
       const incoming = (Array.isArray(data) ? data : obj.add || obj.cards || [])
@@ -753,7 +758,7 @@ function infoMode(view, host) {
     empty: "Ask about any topic, or ask for ideas. You can keep chatting to add more to your page.",
     ideas: ["How do vaccines work?", "Tell me about the Great Barrier Reef", "Ideas for a short story", "Explain photosynthesis simply"],
     onChange: () => { save(); draw(); },
-    async onSend(text) {
+    async onSend(text, hidden, progress) {
       const history = chatHistory(state.chat.slice(0, -2));
       const current = page ? `The student's current page is "${page.title}", with these sections: ${page.sections.map((s) => s.heading).join("; ")}.` : "There's no page yet.";
       if (studyFiles.info.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
@@ -774,7 +779,7 @@ ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}
 Reply with ONLY valid JSON, no markdown:
 {"reply":"a short message (under 50 words)","mode":"new","page":{"title":"...","intro":"1–2 sentences","sections":[{"heading":"...","points":["..."]}],"terms":[{"term":"...","meaning":"..."}],"facts":["..."],"quiz":[{"q":"...","options":["...","...","...","..."],"answer":"..."}]},"remember":[],"forget":[]}
 ${memoryRules()}`, studyFiles.info,
-        "The student uploaded files. Use this material for the page: summarise it, explain it, or answer their questions about it, as they ask."));
+        "The student uploaded files. Use this material for the page: summarise it, explain it, or answer their questions about it, as they ask."), progress);
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
       let note = "";

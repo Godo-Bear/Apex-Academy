@@ -336,7 +336,7 @@
 
   // Triangle with angle labels at the corners: angles = [bottom-left, bottom-right, top].
   function triangleSVG(v) {
-    const labels = (v.angles || ["", "", ""]).map((a) => (a === null || a === undefined ? "" : String(a)));
+    const labels = [...(Array.isArray(v.angles) ? v.angles : []), "", "", ""].slice(0, 3).map((a) => (a === null || a === undefined ? "" : String(a)));
     const known = (a) => (/^\d+(\.\d+)?°?$/.test(a.trim()) ? parseFloat(a) : NaN);
     let A = known(labels[0]), B = known(labels[1]);
     const C = known(labels[2]);

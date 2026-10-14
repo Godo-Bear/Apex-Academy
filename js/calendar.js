@@ -385,7 +385,7 @@ Reply with ONLY valid JSON, no markdown:
       } else toast(plainText(data?.reply || "") || "I couldn't work out the date — try adding the day, or use ＋ Add.");
     } catch (err) {
       console.error(err);
-      toast("Couldn't reach the AI. Use ＋ Add instead.");
+      toast(err.userMessage ? `${err.userMessage} Or use ＋ Add.` : "Couldn't reach the AI. Use ＋ Add instead.");
     }
     btn.disabled = false; btn.textContent = "Add";
   });

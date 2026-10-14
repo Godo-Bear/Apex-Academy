@@ -172,16 +172,49 @@ function cleanTutorAnswer(text) {
     .trim();
 }
 
-// The tutor's answer exactly as written (for replies that are JSON).
-async function askTutorRaw(body) {
-  const { data, error } = await sb.functions.invoke("ask-tutor", { body: typeof body === "string" ? { question: body } : body });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  if (!data?.answer) throw new Error("Empty answer");
-  return String(data.answer);
+// Why an AI request failed, in words a student understands, and whether trying again could help.
+async function aiErrorInfo(err) {
+  const status = err?.context?.status || 0;
+  let detail = err?.aiDetail || "";
+  try { if (!detail && typeof err?.context?.json === "function") detail = (await err.context.clone().json())?.error || ""; } catch (e) { /* not JSON */ }
+  const text = `${detail} ${err?.message || ""}`;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return { retry: false, message: "You seem to be offline. Check your internet connection, then try again." };
+  if (status === 401) return { retry: false, message: "Your login has run out. Refresh the page (and log in again if it asks), then try again." };
+  if (/too long/i.test(text)) return { retry: false, message: "That's too much for the AI in one go. Remove a file or ask for a bit less, then try again." };
+  if (status === 504 || status === 546 || /timed? ?out|time limit|WORKER_LIMIT/i.test(text)) return { retry: false, message: "The AI took too long to answer. Try asking for fewer questions at once (like 5), then ask for more." };
+  if (status === 429 || /busy|overload|rate.?limit|quota|exhausted/i.test(text)) return { retry: true, message: "The AI is really busy right now (lots of people are using it). Wait about 30 seconds, then try again." };
+  if (/stuck/i.test(text)) return { retry: true, message: "The AI got stuck on that one. Try asking in a different way, or for fewer questions at once." };
+  return { retry: true, message: "Sorry, I couldn't reach the AI. Check your internet, then try again in a moment." };
 }
-async function askTutor(body) {
-  return cleanTutorAnswer(await askTutorRaw(body));
+const AI_TRIES = 3;
+// The tutor's answer exactly as written (for replies that are JSON). If the AI is busy or the connection
+// drops, it tries again by itself (up to 3 tries in all); onRetry(n) lets the page say so.
+// Errors it throws have a .userMessage saying what went wrong.
+async function askTutorRaw(body, { onRetry } = {}) {
+  const payload = typeof body === "string" ? { question: body } : body;
+  let failure;
+  for (let attempt = 1; attempt <= AI_TRIES; attempt++) {
+    try {
+      const { data, error } = await sb.functions.invoke("ask-tutor", { body: payload });
+      if (error) throw error;
+      if (data?.error) throw Object.assign(new Error(data.error), { aiDetail: data.error });
+      const answer = String(data?.answer || "");
+      // The AI ran out of room before writing anything (the edge function sends this as an answer).
+      if (!answer || /^Sorry, I couldn't come up with an answer/.test(answer)) throw Object.assign(new Error("Empty answer"), { aiDetail: "stuck" });
+      return answer;
+    } catch (err) {
+      const info = await aiErrorInfo(err);
+      console.warn(`Apex: AI request failed (try ${attempt} of ${AI_TRIES}) —`, err?.context?.status || "", err?.aiDetail || err?.message || err);
+      failure = Object.assign(err instanceof Error ? err : new Error(String(err)), { userMessage: info.message });
+      if (!info.retry || attempt === AI_TRIES) break;
+      onRetry?.(attempt);
+      await new Promise((r) => setTimeout(r, attempt * 2500));
+    }
+  }
+  throw failure;
+}
+async function askTutor(body, opts) {
+  return cleanTutorAnswer(await askTutorRaw(body, opts));
 }
 
 // ---------------- User state ----------------
@@ -1131,7 +1164,7 @@ Break the solution into short numbered steps a Year 7 student could follow easil
       box.dataset.loaded = "1";
     } catch (err) {
       console.error(err);
-      box.textContent = "Couldn't reach the tutor — try again in a moment.";
+      box.textContent = err.userMessage || "Couldn't reach the tutor — try again in a moment.";
     }
     btn.disabled = false;
   }));
@@ -1744,7 +1777,7 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
         if (chatBox && !chatBox.open) { chatBox.open = true; chatBox.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
       } catch (err) {
         console.error(err);
-        box.textContent = "Couldn't get feedback right now — try again in a moment.";
+        box.textContent = err.userMessage || "Couldn't get feedback right now — try again in a moment.";
       }
       if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = "Get AI feedback"; }
     });
@@ -1823,7 +1856,7 @@ Tutor:`;
       } catch (err) {
         console.error(err);
         piece.chat.pop();
-        piece.chat.push({ role: "err", text: "Sorry, I couldn't reach the tutor. Please try again in a moment." });
+        piece.chat.push({ role: "err", text: err.userMessage || "Sorry, I couldn't reach the tutor. Please try again in a moment." });
       }
       if (!document.body.contains(log)) return;
       piece.chat = piece.chat.filter((m) => m.role !== "err" || m === piece.chat[piece.chat.length - 1]);
@@ -2024,7 +2057,7 @@ function pickBuilder(view, host) {
         console.error("Apex: AI test generation failed —", e);
         btn.disabled = false;
         btn.textContent = label;
-        setMsg(err, files.length ? "Couldn't write a test from those files. Try fewer or smaller files, or add an example question." : "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank.", "error");
+        setMsg(err, e.userMessage || (files.length ? "Couldn't write a test from those files. Try fewer or smaller files, or add an example question." : "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank."), "error");
       }
       return;
     }
@@ -2462,12 +2495,14 @@ function pageTutor(view) {
     input.value = "";
     clearImage();
     draw(); drawList();
+    const say = (t) => { if (pending.pending) { pending.text = t; if (chat === current && document.body.contains(chatBox)) draw(); } };
+    const slow = setTimeout(() => say("Still working on it…"), 15000);
 
     try {
       await Promise.all([loadMemory(), ensureCalendar()]);
       const body = { question: tutorPrompt(earlier, question, !!image) };
       if (image) { body.image = image.base64; body.imageMimeType = image.mimeType; }
-      const raw = await askTutorRaw(body);
+      const raw = await askTutorRaw(body, { onRetry: (n) => say(`The AI is busy — trying again (${n + 1} of ${AI_TRIES})…`) });
       const data = parseLooseJSON(raw);
       const obj = data && !Array.isArray(data) ? data : {};
       pending.text = cleanTutorAnswer(aiReplyText(raw, data)) || "Sorry, I couldn't come up with an answer. Try asking another way.";
@@ -2477,8 +2512,9 @@ function pageTutor(view) {
     } catch (err) {
       console.error(err);
       pending.role = "err";
-      pending.text = "Sorry, I couldn't reach the tutor. Please try again in a moment.";
+      pending.text = err.userMessage || "Something went wrong reading the tutor's answer. Please try again.";
     }
+    clearTimeout(slow);
     delete pending.pending;
     saveChat(chat);
     chats.sort((a, b) => (a === chat ? -1 : b === chat ? 1 : 0));
