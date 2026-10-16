@@ -2,7 +2,10 @@
    Apex Learning Academy — app logic
    Pages: Home · Practice · Test · Tutor · Progress · Admin
    Accounts, progress and the AI tutor live in Supabase.
+   © 2026 Jayden Narayan. All rights reserved. Copying or
+   re-publishing this site without permission is not allowed.
 ========================================================= */
+try { console.log("%cApex Learning Academy — © 2026 Jayden Narayan. All rights reserved.", "font-weight:700"); } catch (e) {}
 
 // ---------------- Supabase ----------------
 const SUPABASE_URL = "https://dozlkmoaaskaulejkiiw.supabase.co";
@@ -574,8 +577,9 @@ function watchForUpdates() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-09b";
+const TERMS_VERSION = "2026-10-16a";
 const TERMS_CHANGES = [
+  "New — ownership: Apex Academy (its name, logos, design, code, lessons and questions) belongs to Jayden Narayan. You must not copy it, re-publish it or claim it as your own.",
   "New — calendar: put your tests, assignments and reminders on the calendar (Notes & calendar). It's saved to your account, and the AI can see what's coming up so it can help you prepare (you can turn this off).",
   "New — AI memory: your AI tutor chats are saved to your account, and the AI can remember short notes about you (like topics you find tricky) to help you next time. You can see, delete or turn this off in Settings.",
   "New — public tests: you can share tests with everyone on Apex Academy. Shared tests show your name (unless you turn it off), must follow the behaviour rules, and can be removed by the site owner.",
