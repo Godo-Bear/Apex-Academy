@@ -1,22 +1,22 @@
-/* Apex Learning Academy — styles */
+/* JINtelligence — styles (maroon theme) */
 
 :root {
-  --bg: #F7F6F2;
+  --bg: #F9F3F2;
   --surface: #FFFFFF;
-  --surface-2: #F1EFE8;
-  --ink: #16233D;
-  --muted: #5A6B72;
-  --line: #E2E0D8;
-  --accent: #2F6F76;
+  --surface-2: #F4E9E8;
+  --ink: #2A1520;
+  --muted: #745D64;
+  --line: #EBDADC;
+  --accent: #8A1C3C;
   --accent-ink: #FFFFFF;
-  --accent-soft: #E4F0F0;
+  --accent-soft: #F8E3E8;
   --warm: #D9822B;
   --good: #2F7D4F;
   --good-soft: #E3F2E8;
   --bad: #B84A40;
   --bad-soft: #F8E6E3;
   --radius: 12px;
-  --shadow: 0 1px 2px rgba(22, 35, 61, .06), 0 4px 16px rgba(22, 35, 61, .04);
+  --shadow: 0 1px 2px rgba(90, 20, 40, .07), 0 4px 16px rgba(90, 20, 40, .05);
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --jin: #8A1C3C;
@@ -25,16 +25,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #10151F;
-    --surface: #182030;
-    --surface-2: #1F293B;
-    --ink: #E8EBF0;
-    --muted: #9BA6B4;
-    --line: #2C3547;
-    --accent: #5EC8D8;
+    --bg: #1A0C12;
+    --surface: #27131B;
+    --surface-2: #331A24;
+    --ink: #F4E8EC;
+    --muted: #C4A5AE;
+    --line: #4A2632;
+    --accent: #F07A96;
     --jin: #F07A96;
-    --accent-ink: #0E1520;
-    --accent-soft: #1C3440;
+    --accent-ink: #2A0C16;
+    --accent-soft: #4A1C2A;
     --good: #5CC98A;
     --good-soft: #17301F;
     --bad: #F08A7E;
@@ -45,15 +45,15 @@
 }
 :root[data-theme="dark"] {
   --jin: #F07A96;
-  --bg: #10151F;
-  --surface: #182030;
-  --surface-2: #1F293B;
-  --ink: #E8EBF0;
-  --muted: #9BA6B4;
-  --line: #2C3547;
-  --accent: #5EC8D8;
-  --accent-ink: #0E1520;
-  --accent-soft: #1C3440;
+  --bg: #1A0C12;
+  --surface: #27131B;
+  --surface-2: #331A24;
+  --ink: #F4E8EC;
+  --muted: #C4A5AE;
+  --line: #4A2632;
+  --accent: #F07A96;
+  --accent-ink: #2A0C16;
+  --accent-soft: #4A1C2A;
   --good: #5CC98A;
   --good-soft: #17301F;
   --bad: #F08A7E;
