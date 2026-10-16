@@ -6,19 +6,19 @@
       <rect width="600" height="500" fill="white"/>
       <circle cx="304" cy="40" r="36" fill="black"/>
       <rect x="40" y="334" width="520" height="120" rx="10" fill="black"/>
-    </mask></defs><g mask="url(#jfm)" fill="none" stroke="#1E3765" stroke-width="7"><circle cx="300" cy="250" r="238"/><circle cx="300" cy="250" r="223"/><circle cx="300" cy="250" r="208"/></g><g fill="none" stroke="#1E3765" stroke-width="9" stroke-linejoin="miter" stroke-linecap="butt">
+    </mask></defs><g mask="url(#jfm)" fill="none" stroke="#8A1C3C" stroke-width="7"><circle cx="300" cy="250" r="238"/><circle cx="300" cy="250" r="223"/><circle cx="300" cy="250" r="208"/></g><g fill="none" stroke="#8A1C3C" stroke-width="9" stroke-linejoin="miter" stroke-linecap="butt">
     <path d="M176 304 L176 142 L246 100"/><path d="M424 304 L424 142 L354 100"/><path d="M194 298 L194 152 L252 116" stroke-width="7"/><path d="M406 298 L406 152 L348 116" stroke-width="7"/></g>
-    <path d="M168 306 C220 298 268 306 300 326 C332 306 380 298 432 306" fill="none" stroke="#1E3765" stroke-width="8" stroke-linecap="round"/>
-    <path d="M160 320 C216 312 266 320 300 342 C334 320 384 312 440 320" fill="none" stroke="#1E3765" stroke-width="7" stroke-linecap="round"/>
-    <path d="M182 300 C228 294 270 300 300 318 C330 300 372 294 418 300" fill="none" stroke="#1E3765" stroke-width="6" stroke-linecap="round"/>
-    <path d="M300 232 C270 214 236 206 204 208 L196 296 C232 292 270 298 300 312 Z" fill="#FFFFFF" stroke="#1E3765" stroke-width="7" stroke-linejoin="round"/>
-    <path d="M300 232 C330 214 364 206 396 208 L404 296 C368 292 330 298 300 312 Z" fill="#FFFFFF" stroke="#1E3765" stroke-width="7" stroke-linejoin="round"/>
-    <path d="M300 232 V312" stroke="#1E3765" stroke-width="6"/>
-    <g stroke="#1E3765" stroke-width="4" stroke-linecap="round" opacity=".85">
+    <path d="M168 306 C220 298 268 306 300 326 C332 306 380 298 432 306" fill="none" stroke="#8A1C3C" stroke-width="8" stroke-linecap="round"/>
+    <path d="M160 320 C216 312 266 320 300 342 C334 320 384 312 440 320" fill="none" stroke="#8A1C3C" stroke-width="7" stroke-linecap="round"/>
+    <path d="M182 300 C228 294 270 300 300 318 C330 300 372 294 418 300" fill="none" stroke="#8A1C3C" stroke-width="6" stroke-linecap="round"/>
+    <path d="M300 232 C270 214 236 206 204 208 L196 296 C232 292 270 298 300 312 Z" fill="#FFFFFF" stroke="#8A1C3C" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M300 232 C330 214 364 206 396 208 L404 296 C368 292 330 298 300 312 Z" fill="#FFFFFF" stroke="#8A1C3C" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M300 232 V312" stroke="#8A1C3C" stroke-width="6"/>
+    <g stroke="#8A1C3C" stroke-width="4" stroke-linecap="round" opacity=".85">
       <path d="M218 226 C244 224 266 230 286 240"/><path d="M382 226 C356 224 334 230 314 240"/><path d="M218 244 C244 242 266 248 286 258"/><path d="M382 244 C356 242 334 248 314 258"/><path d="M218 262 C244 260 266 266 286 276"/><path d="M382 262 C356 260 334 266 314 276"/><path d="M218 280 C244 278 266 284 286 294"/><path d="M382 280 C356 278 334 284 314 294"/>
     </g><g transform="translate(300 236) scale(1.06 1.14) translate(-300 -236)">
     <path d="M300 236 C250 228 236 186 258 152 C262 172 272 180 282 172 C274 140 286 104 320 72 C314 104 330 124 340 146 C346 134 350 124 348 108 C378 146 382 214 300 236 Z" fill="url(#jfg)"/>
     <path d="M300 236 C344 224 366 196 362 160 C352 186 336 198 322 200 C336 172 330 140 320 120 C318 150 302 168 296 186 C292 176 286 172 280 170 C276 196 284 222 300 236 Z" fill="url(#jfg2)" opacity=".55"/>
     <path d="M300 232 C278 222 274 198 288 180 C290 194 296 198 302 190 C304 204 320 210 318 222 C316 230 308 234 300 232 Z" fill="#FFF6DA"/></g><path d="M304.0 18.0 L309.8 32.0 L324.9 33.2 L313.4 43.1 L316.9 57.8 L304.0 49.9 L291.1 57.8 L294.6 43.1 L283.1 33.2 L298.2 32.0 Z" fill="url(#jfs)" stroke="#C98B1C" stroke-width="2" stroke-linejoin="round"/>
-  <text x="300" y="404" font-family="JinMont, Montserrat, Arial, sans-serif" font-weight="800" font-size="66" text-anchor="middle" textLength="481.8" lengthAdjust="spacingAndGlyphs"><tspan fill="#8A1C3C">JIN</tspan><tspan fill="#1E3765">telligence</tspan></text>
-  <text x="300" y="446" font-family="JinMont, Montserrat, Arial, sans-serif" font-weight="700" font-size="24" letter-spacing="2" text-anchor="middle" fill="#1E3765">VICTORIAN CURRICULUM</text></svg>
+  <text x="300" y="404" font-family="JinMont, Montserrat, Arial, sans-serif" font-weight="800" font-size="66" text-anchor="middle" textLength="481.8" lengthAdjust="spacingAndGlyphs"><tspan fill="#8A1C3C">JIN</tspan><tspan fill="#8A1C3C">telligence</tspan></text>
+  <text x="300" y="446" font-family="JinMont, Montserrat, Arial, sans-serif" font-weight="700" font-size="24" letter-spacing="2" text-anchor="middle" fill="#8A1C3C">VICTORIAN CURRICULUM</text></svg>
