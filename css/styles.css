@@ -19,6 +19,7 @@
   --shadow: 0 1px 2px rgba(22, 35, 61, .06), 0 4px 16px rgba(22, 35, 61, .04);
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
+  --jin: #8A1C3C;
   color-scheme: light;
 }
 
@@ -31,6 +32,7 @@
     --muted: #9BA6B4;
     --line: #2C3547;
     --accent: #5EC8D8;
+    --jin: #F07A96;
     --accent-ink: #0E1520;
     --accent-soft: #1C3440;
     --good: #5CC98A;
@@ -42,6 +44,7 @@
   }
 }
 :root[data-theme="dark"] {
+  --jin: #F07A96;
   --bg: #10151F;
   --surface: #182030;
   --surface-2: #1F293B;
@@ -142,10 +145,18 @@ label.field { display: block; font-size: 13px; font-weight: 600; margin-bottom: 
 .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 17px; }
 .logo .logo-mark { width: 36px; height: 36px; flex: none; }
 .wordmark { letter-spacing: -0.01em; }
-.wordmark b { color: var(--accent); }
+.wordmark b { color: var(--jin); }
 .logo-stack { flex-direction: column; text-align: center; gap: 8px; font-size: 19px; }
 .logo-crest { display: block; }
-.logo-stack .logo-crest { height: 136px; width: auto; }
+.logo-stack .logo-crest { height: 190px; width: auto; max-width: 100%; }
+/* The full logo has a light and a dark version; show the one that suits the theme. */
+.crest-dark { display: none !important; }
+:root[data-theme="dark"] .crest-light { display: none !important; }
+:root[data-theme="dark"] .crest-dark { display: block !important; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .crest-light { display: none !important; }
+  :root:not([data-theme="light"]) .crest-dark { display: block !important; }
+}
 
 /* Home page brand banner */
 .brand-hero {
@@ -154,7 +165,7 @@ label.field { display: block; font-size: 13px; font-weight: 600; margin-bottom: 
 }
 .brand-hero .logo-crest { height: 104px; width: auto; flex: none; }
 .brand-hero h2 { font-size: 22px; margin: 0; }
-.brand-hero h2 b { color: var(--accent); }
+.brand-hero h2 b { color: var(--jin); }
 .brand-hero p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
 @media (max-width: 760px) { .brand-hero { padding: 16px; gap: 14px; } .brand-hero .logo-crest { height: 76px; width: auto; } .brand-hero h2 { font-size: 18px; } }
 
@@ -1055,7 +1066,7 @@ html[data-text="large"] .sidebar { height: calc(100vh / 1.12); }
 /* Faint repeating "© Jayden Narayan" pattern behind everything, plus a copyright line under each page. */
 body::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='360'%3E%3Ctext x='360' y='180' transform='rotate(-20 360 180)' text-anchor='middle' font-family='Arial,sans-serif' font-weight='700' font-size='17' letter-spacing='4' fill='%23808080'%3EAPEX ACADEMY · © JAYDEN NARAYAN%3C/text%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='460' height='260'%3E%3Ctext x='230' y='130' transform='rotate(-20 230 130)' text-anchor='middle' font-family='Arial,sans-serif' font-weight='700' font-size='17' letter-spacing='4' fill='%23808080'%3E© JAYDEN NARAYAN%3C/text%3E%3C/svg%3E");
   opacity: .09;
 }
 .owner-mark {

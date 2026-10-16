@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  Apex Learning Academy — © 2026 Jayden Narayan. All rights reserved.
+  JINtelligence — © 2026 Jayden Narayan. All rights reserved.
   The design, code, lessons, questions and logos on this site belong to Jayden Narayan.
   Copying or re-publishing this site, or any part of it, without permission is not allowed.
 -->
@@ -8,19 +8,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Apex Learning Academy</title>
+<title>JINtelligence</title>
 <meta name="author" content="Jayden Narayan">
 <meta name="copyright" content="© 2026 Jayden Narayan. All rights reserved.">
 <meta name="description" content="Year 7 Victorian Curriculum maths, English and science practice.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261016a">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg?v=20261016b">
 <!-- Home-screen icon: iPhone/iPad use apple-touch-icon, Android uses the manifest -->
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261016a">
-<meta name="apple-mobile-web-app-title" content="Apex Academy">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20261016b">
+<meta name="apple-mobile-web-app-title" content="JINtelligence">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/styles.css?v=20261016a">
+<link rel="stylesheet" href="css/styles.css?v=20261016b">
 <script>
   // Apply the saved theme before first paint to avoid a flash.
   try { const t = localStorage.getItem("apex-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
@@ -30,10 +30,11 @@
 <body>
 
 <template id="logo-tpl">
-  <img class="logo-mark" src="assets/logo.svg?v=20261016a" alt="">
+  <img class="logo-mark" src="assets/logo.svg?v=20261016b" alt="">
 </template>
 <template id="crest-tpl">
-  <img class="logo-crest" src="assets/crest.svg?v=20261016a" alt="">
+  <img class="logo-crest crest-light" src="assets/crest.svg?v=20261016b" alt="JINtelligence">
+  <img class="logo-crest crest-dark" src="assets/crest-dark.svg?v=20261016b" alt="JINtelligence">
 </template>
 
 <!-- Loading -->
@@ -42,7 +43,7 @@
 <!-- Auth -->
 <div id="screen-auth" class="center-screen hidden">
   <div class="card auth-card">
-    <div class="logo logo-stack" data-logo><span class="wordmark"><b>Apex</b> Learning Academy</span></div>
+    <div class="logo logo-stack" data-logo></div>
     <p class="muted small" style="text-align:center;">Year 7 Maths, English &amp; Science · Victorian Curriculum</p>
 
     <div id="auth-main">
@@ -90,26 +91,26 @@
       <button type="submit" class="btn block">Save password</button>
     </form>
   </div>
-  <footer class="owner-mark">© 2026 Jayden Narayan · Apex Learning Academy · All rights reserved</footer>
+  <footer class="owner-mark">© 2026 Jayden Narayan · JINtelligence · All rights reserved</footer>
 </div>
 
 <!-- Paywall -->
 <div id="screen-paywall" class="center-screen hidden">
   <div class="card auth-card" style="text-align:center;">
-    <div class="logo logo-stack" data-logo><span class="wordmark"><b>Apex</b> Learning Academy</span></div>
+    <div class="logo logo-stack" data-logo></div>
     <h2 style="margin-top:20px;">Almost there</h2>
     <p class="muted">Your account (<strong id="paywall-email"></strong>) isn't active yet. Access is <strong>$10 for 6 months, paid cash in hand</strong> to the site owner. The owner unlocks accounts by hand, so it may take a while after you've paid. Once it's unlocked, check again.</p>
     <p class="small"><a href="#" data-open="terms">Terms &amp; Conditions</a></p>
     <button id="paywall-recheck" class="btn block">I've paid — check again</button>
     <button id="paywall-logout" class="btn ghost" style="margin-top:8px;">Log out</button>
   </div>
-  <footer class="owner-mark">© 2026 Jayden Narayan · Apex Learning Academy · All rights reserved</footer>
+  <footer class="owner-mark">© 2026 Jayden Narayan · JINtelligence · All rights reserved</footer>
 </div>
 
 <!-- App -->
 <div id="screen-app" class="app hidden">
   <aside class="sidebar">
-    <div class="logo" data-logo><span class="wordmark"><b>Apex</b> Academy</span></div>
+    <div class="logo" data-logo><span class="wordmark"><b>JIN</b>telligence</span></div>
     <nav id="nav"></nav>
     <div class="sidebar-foot">
       <button class="nav-link" data-open="terms"><span class="ico">📄</span><span>Terms and Conditions</span></button>
@@ -121,7 +122,7 @@
 
   <main>
     <div class="mobile-top">
-      <div class="logo" data-logo><span class="wordmark"><b>Apex</b><span class="wm-rest"> Academy</span></span></div>
+      <div class="logo" data-logo><span class="wordmark"><b>JIN</b>telligence</span></div>
       <div class="row" style="gap:4px;">
         <span class="small muted" id="me-stats-mobile"></span>
         <button class="btn ghost" id="theme-toggle-m" aria-label="Toggle theme">◐</button>
@@ -130,7 +131,7 @@
     </div>
     <div id="event-bar" class="hidden"></div>
     <div id="view"></div>
-    <footer class="owner-mark">© 2026 Jayden Narayan · Apex Learning Academy · All rights reserved</footer>
+    <footer class="owner-mark">© 2026 Jayden Narayan · JINtelligence · All rights reserved</footer>
   </main>
 
   <nav class="tabbar" id="tabbar"></nav>
@@ -168,7 +169,7 @@
 <div id="modal-terms-update" class="modal hidden" data-sticky="1">
   <div class="card stack">
     <h2 style="margin:0;">📄 Our Terms and Conditions have changed</h2>
-    <p class="muted" style="margin:0;">Please read what's new. You need to agree to keep using Apex Academy.</p>
+    <p class="muted" style="margin:0;">Please read what's new. You need to agree to keep using JINtelligence.</p>
     <ul id="terms-changes" class="small" style="margin:0; padding-left:20px;"></ul>
     <div class="row between">
       <button class="btn ghost" id="terms-read">Read full terms</button>
@@ -182,7 +183,7 @@
   <div class="card stack">
     <h2 style="margin:0;">⏰ Your access is ending soon</h2>
     <p id="renew-text" style="margin:0;"></p>
-    <p class="muted small" style="margin:0;">To keep using Apex Academy, pay <strong>$10 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so pay early. It may take a while to be renewed. Your progress is kept either way.</p>
+    <p class="muted small" style="margin:0;">To keep using JINtelligence, pay <strong>$10 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so pay early. It may take a while to be renewed. Your progress is kept either way.</p>
     <div class="row between">
       <button class="btn ghost" data-open="terms">Terms and Conditions</button>
       <button class="btn" id="renew-ok">Got it</button>
@@ -195,7 +196,7 @@
   <div class="card stack" style="max-width:560px;">
     <div class="row between"><h2 style="margin:0;">Terms and Conditions</h2><button class="btn ghost" data-close>✕</button></div>
     <div class="small muted" style="max-height:60vh; overflow-y:auto;">
-      <p><strong>1. What this is.</strong> Apex Learning Academy is a paid maths, English and science practice site covering the Year 7 Victorian Curriculum. Access costs <strong>$10 AUD every 6 months</strong> per account.</p>
+      <p><strong>1. What this is.</strong> JINtelligence (formerly Apex Learning Academy) is a paid maths, English and science practice site covering the Year 7 Victorian Curriculum. Access costs <strong>$10 AUD every 6 months</strong> per account.</p>
       <p><strong>2. Payment.</strong> Payment is <strong>cash in hand only</strong>, paid directly to the site owner. No card, bank transfer or online payments are accepted, and nothing is charged through this website. Accounts are unlocked by hand by the owner, so <strong>it may take a while for your account to be unlocked</strong> after you've paid (usually within a few days). Your 6 months start from the day your account is unlocked.</p>
       <p><strong>3. Renewing.</strong> To keep using the site after 6 months, pay another $10 cash in hand. If you don't renew, your account is paused until you do; your progress is kept.</p>
       <p class="terms-refund"><strong>4. No refunds.</strong> All payments are final. <strong>No refunds will be given</strong> once payment has been made, including if you stop using the site before your 6 months are up.</p>
@@ -204,27 +205,27 @@
       <p><strong>7. Behaviour.</strong> Be respectful. Usernames, feedback messages and anything you type into the site must not be rude, offensive, bullying or inappropriate. This includes tests you share publicly: everyone with an account can see and take a public test, along with your name unless you choose to hide it. The site owner can remove any public test. Accounts that break this rule may be suspended without a refund. Your username and points can be seen by other users on the leaderboard. If you hide your points in Settings, your name is hidden too and you show as "Hidden player".</p>
       <p><strong>8. Content.</strong> Practice questions and lessons are provided for study purposes and, while checked for accuracy, are not officially affiliated with or endorsed by any curriculum authority or textbook publisher.</p>
       <p><strong>9. Safety and privacy.</strong> If you are under 18, a parent or guardian must agree to these terms before you sign up. We store your email, username, progress, points, your saved writing, notes, flashcards and calendar, and your AI tutor chats so the site can work. The AI can see what's coming up in your calendar so it can help you prepare (you can turn this off on the calendar). The AI can also remember short notes about you from your chats (like topics you find tricky or a test coming up) so it can help you better next time; it is told not to remember private details, and you can see, delete or turn off these memories in Settings. Only you and the site owner (admin) can see your saved writing, notes, calendar, AI chats and AI memories. We never sell your data. You can ask for your account and data to be deleted at any time using Feedback.</p>
-      <p><strong>10. No guarantees.</strong> Practising on Apex Academy can help, but it does not guarantee better marks or results at school. The site may sometimes be unavailable for updates or fixes; no refunds are given for time it is unavailable. The owner may change, add or remove features, and may close the site. If the site closes, users will be told beforehand where possible.</p>
+      <p><strong>10. No guarantees.</strong> Practising on JINtelligence can help, but it does not guarantee better marks or results at school. The site may sometimes be unavailable for updates or fixes; no refunds are given for time it is unavailable. The owner may change, add or remove features, and may close the site. If the site closes, users will be told beforehand where possible.</p>
       <p><strong>11. Changes to these terms.</strong> These terms may be updated from time to time. If they change, you will be shown what's new and asked to agree before you keep using the site.</p>
-      <p><strong>12. Ownership.</strong> Apex Learning Academy, including its name, logos, design, code, lessons and questions, was made by and belongs to <strong>Jayden Narayan</strong>. You must not copy, re-publish, sell or claim the site, or any part of it, as your own.</p>
+      <p><strong>12. Ownership.</strong> JINtelligence, including its name, logos, design, code, lessons and questions, was made by and belongs to <strong>Jayden Narayan</strong>. You must not copy, re-publish, sell or claim the site, or any part of it, as your own.</p>
       <p><strong>13. Contact.</strong> Questions about these terms can be sent via Feedback.</p>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/data.js?v=20261016a"></script>
-<script src="js/lessons.js?v=20261016a"></script>
-<script src="js/visuals.js?v=20261016a"></script>
-<script src="js/sci-visuals.js?v=20261016a"></script>
-<script src="js/science.js?v=20261016a"></script>
-<script src="js/bank.js?v=20261016a"></script>
-<script src="js/uploads.js?v=20261016a"></script>
-<script src="js/study.js?v=20261016a"></script>
-<script src="js/notes.js?v=20261016a"></script>
-<script src="js/public-tests.js?v=20261016a"></script>
-<script src="js/ai-memory.js?v=20261016a"></script>
-<script src="js/calendar.js?v=20261016a"></script>
-<script src="js/app.js?v=20261016a"></script>
+<script src="js/data.js?v=20261016b"></script>
+<script src="js/lessons.js?v=20261016b"></script>
+<script src="js/visuals.js?v=20261016b"></script>
+<script src="js/sci-visuals.js?v=20261016b"></script>
+<script src="js/science.js?v=20261016b"></script>
+<script src="js/bank.js?v=20261016b"></script>
+<script src="js/uploads.js?v=20261016b"></script>
+<script src="js/study.js?v=20261016b"></script>
+<script src="js/notes.js?v=20261016b"></script>
+<script src="js/public-tests.js?v=20261016b"></script>
+<script src="js/ai-memory.js?v=20261016b"></script>
+<script src="js/calendar.js?v=20261016b"></script>
+<script src="js/app.js?v=20261016b"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// Apex Academy — AI tutor (Supabase Edge Function "ask-tutor").
+// JINtelligence — AI tutor (Supabase Edge Function "ask-tutor").
 // Paste into Supabase → Edge Functions → ask-tutor → Code, then press Deploy.
 // Uses the GEMINI_API_KEY secret that is already set up.
 
@@ -12,7 +12,7 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-const SYSTEM_PROMPT = `You are the AI tutor for Apex Academy, a study website for Year 7 students in Victoria, Australia.
+const SYSTEM_PROMPT = `You are the AI tutor for JINtelligence, a study website for Year 7 students in Victoria, Australia.
 
 Help with ANY school subject: maths, English, science, history, geography, health and PE, languages, the arts, digital technologies, general knowledge, study skills, and ideas for assignments, projects and stories. Follow the Victorian Curriculum where it applies.
 

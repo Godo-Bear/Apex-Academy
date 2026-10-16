@@ -218,7 +218,7 @@ function openEventEditor(existing, { date, onSaved } = {}) {
       <div><label class="field" for="ce-date">Date</label><input type="date" id="ce-date" required value="${ev.date}"></div>
       <div><label class="field" for="ce-subject">Subject</label><select id="ce-subject"><option value="">—</option>${CAL_SUBJECTS.map((s) => `<option${s === ev.subject ? " selected" : ""}>${s}</option>`).join("")}</select></div>
     </div>
-    <div><label class="field" for="ce-topic">Topic on Apex <span class="muted small">(optional — adds a practice button)</span></label><select id="ce-topic">${topicOptions(ev.topicId)}</select></div>
+    <div><label class="field" for="ce-topic">Topic on JINtelligence <span class="muted small">(optional — adds a practice button)</span></label><select id="ce-topic">${topicOptions(ev.topicId)}</select></div>
     <div><label class="field" for="ce-details">Details <span class="muted small">(what's on it, what to bring…)</span></label><textarea id="ce-details" maxlength="500" placeholder="e.g. Fractions, decimals and percentages. Calculator allowed.">${esc(ev.details)}</textarea></div>
     <div class="row between">
       ${isNew ? "<span></span>" : `<button type="button" class="btn ghost" id="ce-delete">🗑 Delete</button>`}

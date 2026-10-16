@@ -1,11 +1,11 @@
 /* =========================================================
-   Apex Learning Academy — app logic
+   JINtelligence — app logic
    Pages: Home · Practice · Test · Tutor · Progress · Admin
    Accounts, progress and the AI tutor live in Supabase.
    © 2026 Jayden Narayan. All rights reserved. Copying or
    re-publishing this site without permission is not allowed.
 ========================================================= */
-try { console.log("%cApex Learning Academy — © 2026 Jayden Narayan. All rights reserved.", "font-weight:700"); } catch (e) {}
+try { console.log("%cJINtelligence — © 2026 Jayden Narayan. All rights reserved.", "font-weight:700"); } catch (e) {}
 
 // ---------------- Supabase ----------------
 const SUPABASE_URL = "https://dozlkmoaaskaulejkiiw.supabase.co";
@@ -565,7 +565,7 @@ function watchForUpdates() {
       if (!newer) return;
       const bar = document.createElement("div");
       bar.className = "update-bar";
-      bar.innerHTML = `<span>✨ A new version of Apex Academy is ready.</span><button class="btn sm" type="button">Update</button><button class="btn ghost sm" type="button" aria-label="Later" style="color:inherit;">✕</button>`;
+      bar.innerHTML = `<span>✨ A new version of JINtelligence is ready.</span><button class="btn sm" type="button">Update</button><button class="btn ghost sm" type="button" aria-label="Later" style="color:inherit;">✕</button>`;
       $$("button", bar)[0].addEventListener("click", () => { if (!leaveWarning || confirm(leaveWarning)) installUpdate(latest); });
       $$("button", bar)[1].addEventListener("click", () => bar.remove());
       document.body.appendChild(bar);
@@ -577,12 +577,13 @@ function watchForUpdates() {
 // ---------------- Login notices ----------------
 // When the Terms and Conditions change: bump TERMS_VERSION and update TERMS_CHANGES.
 // Everyone then sees the "terms have changed" pop-up once and must agree.
-const TERMS_VERSION = "2026-10-16a";
+const TERMS_VERSION = "2026-10-16b";
 const TERMS_CHANGES = [
-  "New — ownership: Apex Academy (its name, logos, design, code, lessons and questions) belongs to Jayden Narayan. You must not copy it, re-publish it or claim it as your own.",
+  "New name: Apex Academy is now called JINtelligence. Everything else (your account, progress and payments) stays the same.",
+  "New — ownership: JINtelligence (its name, logos, design, code, lessons and questions) belongs to Jayden Narayan. You must not copy it, re-publish it or claim it as your own.",
   "New — calendar: put your tests, assignments and reminders on the calendar (Notes & calendar). It's saved to your account, and the AI can see what's coming up so it can help you prepare (you can turn this off).",
   "New — AI memory: your AI tutor chats are saved to your account, and the AI can remember short notes about you (like topics you find tricky) to help you next time. You can see, delete or turn this off in Settings.",
-  "New — public tests: you can share tests with everyone on Apex Academy. Shared tests show your name (unless you turn it off), must follow the behaviour rules, and can be removed by the site owner.",
+  "New — public tests: you can share tests with everyone on JINtelligence. Shared tests show your name (unless you turn it off), must follow the behaviour rules, and can be removed by the site owner.",
   "Access is $10 AUD every 6 months, paid cash in hand to the site owner.",
   "Accounts are unlocked by hand, so it may take a while after paying. No refunds.",
   "Using the AI: it's for learning. Don't hand in AI-written work as your own.",
@@ -813,9 +814,9 @@ function pageHome(view) {
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   view.innerHTML = `
     <div class="card brand-hero">
-      ${$("#crest-tpl").innerHTML}
+      ${$("#logo-tpl").innerHTML.replace("logo-mark", "logo-crest")}
       <div>
-        <h2><b>Apex</b> Learning Academy</h2>
+        <h2><b>JIN</b>telligence</h2>
         <p>Year 7 Maths, English &amp; Science · Victorian Curriculum</p>
       </div>
     </div>

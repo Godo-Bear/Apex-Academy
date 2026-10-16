@@ -1,7 +1,7 @@
 /* Year 7 Science (Victorian Curriculum), following the eight modules of a Year 7 course:
    1 Science toolkit · 2 Classification · 3 Ecosystems · 4 Resources · 5 Earth, Sun and Moon · 6 Forces ·
    7 Particle theory · 8 Mixtures.
-   All explanations and questions are written for Apex Academy (not copied from any textbook).
+   All explanations and questions are written for JINtelligence (not copied from any textbook).
    Loaded after visuals.js and sci-visuals.js (it uses their diagrams and widgets). */
 const SCIENCE_TOPICS = (function () {
   // Question builders.

@@ -61,7 +61,7 @@ function openShareTest(items, { minutes = 0, title = "" } = {}) {
   modal.innerHTML = `
     <div class="card stack" style="max-width:520px;">
       <div class="row between"><h2 style="margin:0;">🌍 Share this test</h2><button class="btn ghost" data-close>✕</button></div>
-      <p class="muted small" style="margin:0;">Everyone with an Apex Academy account will be able to find this test and take it. Don't put personal information in it.</p>
+      <p class="muted small" style="margin:0;">Everyone with a JINtelligence account will be able to find this test and take it. Don't put personal information in it.</p>
       <div><label class="field" for="sh-title">Test name</label>
         <input type="text" id="sh-title" maxlength="80" value="${esc(title)}" placeholder="e.g. Fractions warm-up"></div>
       <div><label class="field" for="sh-subject">Subject</label>
