@@ -1,6 +1,6 @@
 // Cloudflare deploy settings: serve this folder as a static website.
 {
-  "name": "apex-academy",
+  "name": "jintelligence",
   "compatibility_date": "2025-09-01",
   "assets": {
     "directory": ".",
