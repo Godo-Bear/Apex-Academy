@@ -82,6 +82,7 @@ const NAV = [
   { route: "practice", label: "Practice", icon: "📚" },
   { route: "test", label: "Test", icon: "📝" },
   { route: "tutor", label: "Tutor", icon: "🤖" },
+  { route: "games", label: "Games", icon: "🎮" },
   { route: "progress", label: "Progress", icon: "📈" },
 ];
 
@@ -775,7 +776,7 @@ function route() {
   lastHash = location.hash;
   const [page = "home", arg, arg2] = location.hash.replace(/^#\/?/, "").split("/");
   const view = $("#view");
-  const pages = { home: pageHome, practice: pagePractice, test: pageTest, tutor: pageTutor, progress: pageProgress, notes: pageNotes, admin: pageAdmin, settings: pageSettings };
+  const pages = { home: pageHome, practice: pagePractice, test: pageTest, games: pageGames, tutor: pageTutor, progress: pageProgress, notes: pageNotes, admin: pageAdmin, settings: pageSettings };
   const render = pages[page] || pageHome;
   const navRoute = pages[page] ? page : "home";
   $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === navRoute));
@@ -851,6 +852,7 @@ function pageHome(view) {
     <div class="grid topics">
       ${quickCard("#/practice", "📚", "Practice", "Work through topics at your own pace.")}
       ${quickCard("#/test", "📝", "Take a test", "Mix topics against the clock.")}
+      ${quickCard("#/games", "🎮", "Play a game", "Beat the clock or survive with 3 lives.")}
       ${quickCard("#/tutor", "🤖", "Ask the tutor", "Stuck? Get a friendly explanation.")}
     </div>
   `;

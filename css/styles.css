@@ -212,12 +212,12 @@ main { padding: 32px clamp(16px, 4vw, 48px) 96px; max-width: 980px; width: 100%;
   main { padding-top: 20px; }
   .mobile-top { display: flex !important; }
   .tabbar {
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(6, 1fr);
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
     background: var(--surface); border-top: 1px solid var(--line);
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
   }
-  .tabbar a { display: grid; justify-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--muted); text-decoration: none; padding: 4px 0; }
+  .tabbar a { display: grid; justify-items: center; gap: 2px; font-size: 10.5px; font-weight: 600; color: var(--muted); text-decoration: none; padding: 4px 0; }
   .tabbar a .ico { font-size: 19px; }
   .tabbar a.active { color: var(--accent); }
   .grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -1074,3 +1074,43 @@ body::before {
   color: var(--muted); opacity: .85; user-select: none;
 }
 .center-screen > .owner-mark { margin-top: 18px; }
+
+/* ---------------- Games ---------------- */
+.game-pick { display: grid; gap: 10px; }
+.game-pick.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.game-pick.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) { .game-pick.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .game-pick.cols-2 { grid-template-columns: 1fr; } }
+.game-opt {
+  display: grid; justify-items: start; align-content: start; gap: 4px; text-align: left; min-width: 0;
+  padding: 14px 16px; border: 2px solid var(--line); border-radius: var(--radius); background: var(--surface);
+  color: var(--ink); font: inherit; cursor: pointer; transition: border-color .15s, background .15s, transform .15s;
+}
+.game-opt:hover { border-color: var(--accent); }
+.game-opt:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.game-opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.game-opt b { font-family: var(--font-display); font-size: 16px; }
+.game-opt .g-ico { font-size: 26px; line-height: 1; }
+.game-opts { grid-template-columns: 1fr 1fr; }
+@media (max-width: 500px) { .game-opts { grid-template-columns: 1fr; } }
+.game-rules { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); font-size: 14px; }
+.game-hud { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 10px; }
+.game-hud .g-title { display: flex; align-items: center; gap: 10px; }
+.game-hud .g-title b { display: block; font-family: var(--font-display); }
+.game-hud .g-ico { font-size: 26px; }
+.g-stats { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pill-stat { padding: 5px 12px; border-radius: 999px; background: var(--surface-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+.pill-stat b { font-family: var(--font-display); }
+.pill-stat.timer { font-size: 15px; }
+.hearts { font-size: 20px; letter-spacing: 2px; }
+.hearts .lost { opacity: .35; }
+.time-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-bottom: 12px; }
+.time-bar div { height: 100%; background: var(--accent); border-radius: 999px; transition: width 1s linear, background .3s; }
+.time-bar.low div { background: var(--bad); }
+.game-card { transition: box-shadow .2s, border-color .2s; }
+.game-card.flash-good { border-color: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+.game-card.flash-bad { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); animation: g-shake .35s; }
+@keyframes g-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.game-over { text-align: center; display: grid; gap: 6px; padding: 24px; }
+.game-over .g-big { font-family: var(--font-display); font-size: 48px; font-weight: 700; color: var(--accent); }
+.game-over .g-best { font-weight: 700; color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .game-card.flash-bad { animation: none; } .time-bar div { transition: none; } }
