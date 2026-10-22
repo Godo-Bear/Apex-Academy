@@ -39,7 +39,6 @@ const LEVEL_UP_EVERY = 3; // right answers needed to move up a difficulty
 const LEVEL_NAMES = { 1: "Easy", 2: "Medium", 3: "Hard" };
 const SURVIVAL_START = 30, SURVIVAL_STEP = 5;
 const BOSS_HP = 100, PLAYER_HP = 100, BOSS_HIT = { 1: 10, 2: 15, 3: 20 }, PLAYER_HIT = 25;
-const BOSSES = ["👾", "🐉", "🤖"];
 const LADDER = [100, 200, 300, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 125000, 250000, 500000, 1000000];
 const SAFE_STEPS = [5, 10]; // reaching these questions banks the prize
 const COMBO_BONUS = (combo) => (combo % 5 ? 0 : combo >= 10 ? 50 : 25); // bonus points at 5, 10, 15… in a row
@@ -277,7 +276,7 @@ function playGame(view, s, extra = {}) {
     right: 0, combo: 0, bestCombo: 0, bonus: 0, results: [], answers: [], over: false, current: null, paused: false,
     lives: mode === "lives" ? 3 : 1, level: 1, i: 0,
     left: timedQ, total: mode === "survival" ? SURVIVAL_START : timedTotal, survived: 0,
-    bossHP: BOSS_HP, hp: PLAYER_HP, boss: BOSSES[Math.floor(Math.random() * BOSSES.length)],
+    bossHP: BOSS_HP, hp: PLAYER_HP, boss: GAME_BOSSES[Math.floor(Math.random() * GAME_BOSSES.length)],
     step: 0, fifty: true, ai: true, won: false,
   };
   const pausable = !!(timedQ || timedTotal || mode === "survival");
@@ -302,9 +301,9 @@ function playGame(view, s, extra = {}) {
         <rect x="0" y="200" width="800" height="100" fill="url(#bs-mist-g)"/>
       </svg>
       <div class="bs-hud you"><b>You</b><div class="hp"><div class="hp-fill you" id="g-hp-you"></div></div><span id="g-hp-you-n"></span></div>
-      <div class="bs-hud boss"><b>Boss</b><div class="hp"><div class="hp-fill boss" id="g-hp-boss"></div></div><span id="g-hp-boss-n"></span></div>
-      <div class="bs-char bs-player" id="g-player"><span>🧑‍🎓</span></div>
-      <div class="bs-char bs-enemy" id="g-enemy"><span>${st.boss}</span></div>
+      <div class="bs-hud boss"><b>${st.boss.name}</b><div class="hp"><div class="hp-fill boss" id="g-hp-boss"></div></div><span id="g-hp-boss-n"></span></div>
+      <div class="bs-char bs-player" id="g-player">${GAME_PLAYER_SVG}</div>
+      <div class="bs-char bs-enemy" id="g-enemy">${st.boss.svg}</div>
       <div class="bs-msg" id="g-bs-msg">Answer questions to attack!</div>
     </div>` : ""}
     ${mode === "millionaire" ? `<div class="card ladder-bar" id="g-ladder"></div>` : ""}
@@ -586,7 +585,7 @@ function playGame(view, s, extra = {}) {
 
     const headline =
       mode === "millionaire" ? fmtCoins(coins)
-      : mode === "boss" ? (st.won ? "Boss defeated! 🏆" : `${st.boss} The boss won`)
+      : mode === "boss" ? (st.won ? `${st.boss.name} defeated! 🏆` : `The ${st.boss.name} won`)
       : fixed ? `${st.right}/${list.length}` : `${st.right} right`;
     const sub =
       mode === "survival" ? `You lasted ${clockText(st.survived)}.`

@@ -1180,16 +1180,20 @@ body::before {
 .bs-hud { position: absolute; top: 12px; width: min(38%, 240px); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--bs-text); }
 .bs-hud.you { left: 14px; } .bs-hud.boss { right: 14px; }
 .bs-hud .hp { background: rgba(255,255,255,.55); height: 10px; }
-.bs-char { position: absolute; bottom: 31%; line-height: 1; transform-origin: 50% 100%; animation: bs-idle 2.4s ease-in-out infinite; }
-.bs-player { left: 22%; font-size: clamp(40px, 6vw, 56px); }
-.bs-enemy { left: 60%; font-size: clamp(64px, 10vw, 96px); animation-delay: -1.2s; }
-.bs-char span { display: inline-block; }
-.bs-player span { transform: scaleX(-1); } /* face the boss */
-@keyframes bs-idle { 50% { transform: translateY(-5px); } }
-.bs-char.throw span { animation: bs-throw .35s ease-out; }
-.bs-player.throw span { animation-name: bs-throw-p; }
-@keyframes bs-throw { 40% { transform: translateX(-10px) rotate(-10deg); } }
-@keyframes bs-throw-p { 40% { transform: scaleX(-1) translateX(-10px) rotate(-10deg); } 0%, 100% { transform: scaleX(-1); } }
+.bs-char { position: absolute; bottom: calc(31% - 6px); line-height: 0; transform-origin: 50% 100%; animation: bs-idle 2.4s ease-in-out infinite; }
+.bs-char svg { display: block; width: 100%; height: auto; overflow: visible; }
+.bs-player { left: 20%; width: clamp(54px, 8.5vw, 92px); }
+.bs-enemy { left: 58%; width: clamp(96px, 15vw, 160px); animation-delay: -1.2s; }
+@keyframes bs-idle { 50% { transform: translateY(-4px) scaleY(1.02); } }
+.bs-char .arm { transform-box: view-box; }
+.bs-player.throw .arm { animation: bs-arm-p .4s ease-out; }
+.bs-enemy.throw .arm { animation: bs-arm-e .4s ease-out; }
+@keyframes bs-arm-p { 35% { transform: rotate(150deg); } 70% { transform: rotate(-40deg); } }
+@keyframes bs-arm-e { 35% { transform: rotate(-130deg); } 70% { transform: rotate(30deg); } }
+.bs-char .eyes { transform-box: view-box; animation: bs-blink 4.5s infinite; }
+@keyframes bs-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
+.bot-light { animation: bs-light 1s steps(2) infinite; }
+@keyframes bs-light { 50% { opacity: .3; } }
 .bs-char.hurt { animation: bs-hurt .5s ease-out, bs-idle 2.4s ease-in-out .5s infinite; }
 @keyframes bs-hurt { 20% { transform: translateX(10px) rotate(6deg); filter: brightness(2) saturate(.3); } 50% { transform: translateX(-8px) rotate(-4deg); } }
 .bs-char.ko { animation: bs-ko .8s ease-in forwards; }
@@ -1200,5 +1204,11 @@ body::before {
 .bs-dmg { position: absolute; z-index: 3; transform: translateX(-50%); font-family: var(--font-display); font-weight: 800; font-size: 22px; animation: bs-dmg 1s ease-out forwards; pointer-events: none; text-shadow: 0 2px 0 rgba(255,255,255,.7); }
 .bs-dmg.good { color: #c0392b; } .bs-dmg.bad { color: #c0392b; }
 @keyframes bs-dmg { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -36px); } }
-.bs-msg { position: absolute; left: 0; right: 0; top: 44%; text-align: center; font-weight: 800; font-size: clamp(14px, 2vw, 18px); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45); pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .bs-char, .bs-char.hurt { animation: none; } .bs-dmg { animation-duration: .01s; } }
+.bs-msg { position: absolute; left: 0; right: 0; bottom: 8%; text-align: center; font-weight: 800; font-size: clamp(14px, 2vw, 18px); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45); pointer-events: none; }
+@media (max-width: 560px) {
+  .bs-hud { top: 8px; width: 42%; grid-template-columns: 1fr auto; gap: 2px 6px; font-size: 11px; }
+  .bs-hud b { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-hud.you { left: 10px; } .bs-hud.boss { right: 10px; }
+  .bs-char { bottom: calc(31% - 4px); }
+}
+@media (prefers-reduced-motion: reduce) { .bs-char, .bs-char.hurt, .bs-char .eyes, .bs-char .arm, .bot-light { animation: none !important; } .bs-dmg { animation-duration: .01s; } }
