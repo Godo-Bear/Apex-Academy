@@ -113,10 +113,16 @@
     <div class="logo" data-logo><span class="wordmark"><b>JIN</b>telligence</span></div>
     <nav id="nav"></nav>
     <div class="sidebar-foot">
-      <button class="nav-link" data-open="terms"><span class="ico">📄</span><span>Terms and Conditions</span></button>
-      <div class="me-box"><strong id="me-name"></strong><span class="muted" id="me-rank" style="display:block;"></span><span class="muted" id="me-stats"></span></div>
-      <button class="nav-link" data-open="feedback"><span class="ico">💬</span><span>Feedback</span></button>
-      <a class="nav-link" href="#/settings" data-route="settings"><span class="ico">⚙️</span><span>Settings</span></a>
+      <a class="me-card" href="#/progress" data-route="progress" title="See your progress">
+        <span class="me-avatar" id="me-avatar" aria-hidden="true"></span>
+        <span class="me-text"><strong id="me-name"></strong><span id="me-rank"></span><span id="me-stats"></span></span>
+      </a>
+      <div class="foot-icons">
+        <a class="foot-icon" href="#/settings" data-route="settings"><span class="ico">⚙️</span>Settings</a>
+        <button class="foot-icon" type="button" data-open="feedback"><span class="ico">💬</span>Feedback</button>
+        <button class="foot-icon" type="button" data-open="terms"><span class="ico">📄</span>Terms</button>
+        <a class="foot-icon hidden" id="foot-admin" href="#/admin" data-route="admin"><span class="ico">🛠</span>Admin</a>
+      </div>
     </div>
   </aside>
 

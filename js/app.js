@@ -525,12 +525,13 @@ async function loadCustomQuestions() {
 
 // ---------------- App shell & routing ----------------
 function enterApp() {
-  const items = [...NAV, { route: "notes", label: "Notes & calendar", icon: "🗓️" }, ...(me.isAdmin ? [{ route: "admin", label: "Admin", icon: "🛠" }] : [])];
+  const items = [...NAV, { route: "notes", label: "Notes & calendar", icon: "🗓️" }];
   $("#nav").innerHTML = items.map((n) =>
     `<a class="nav-link" href="#/${n.route}" data-route="${n.route}"><span class="ico">${n.icon}</span><span>${n.label}</span></a>`).join("");
   $("#tabbar").innerHTML = NAV.map((n) =>
     `<a href="#/${n.route}" data-route="${n.route}"><span class="ico">${n.icon}</span><span>${n.label}</span></a>`).join("");
   $("#menu-admin").classList.toggle("hidden", !me.isAdmin);
+  $("#foot-admin").classList.toggle("hidden", !me.isAdmin);
   renderMeBox();
   showScreen("app");
   route();
@@ -750,6 +751,7 @@ function renderMeBox() {
   const line = `✦ ${me.points} pts · 🔥 ${currentStreak()}`;
   const { current } = levelInfo(me.xp, me.isAdmin);
   $("#me-name").textContent = me.name;
+  $("#me-avatar").textContent = (me.name || "?").trim().charAt(0).toUpperCase();
   $("#me-rank").innerHTML = `${current.icon} ${esc(current.name)} · ${me.xp} XP`;
   $("#me-stats").textContent = line;
   $("#me-stats-mobile").textContent = line;

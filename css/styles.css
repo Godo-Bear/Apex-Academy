@@ -193,10 +193,22 @@ label.field { display: block; font-size: 13px; font-weight: 600; margin-bottom: 
 .nav-link:hover { background: var(--surface-2); color: var(--ink); }
 .nav-link.active { background: var(--accent-soft); color: var(--accent); }
 .nav-link .ico { width: 22px; text-align: center; font-size: 17px; }
-.sidebar-foot { margin-top: auto; display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 12px; }
-.sidebar-foot button { border: 0; background: transparent; text-align: left; cursor: pointer; }
-.me-box { padding: 8px 12px 12px; font-size: 13px; }
-.me-box strong { display: block; font-size: 14px; }
+.nav-link span:last-child { white-space: nowrap; }
+.sidebar-foot { margin-top: auto; display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+/* Your profile: tap to see your progress */
+.me-card { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; color: inherit; text-decoration: none; }
+.me-card:hover, .me-card.active { background: var(--surface-2); }
+.me-avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 700; font-size: 16px; }
+.me-text { min-width: 0; display: grid; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.me-text strong { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Settings, Feedback, Terms (and Admin) as one compact row */
+.foot-icons { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
+.foot-icon { display: grid; justify-items: center; gap: 2px; padding: 6px 2px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: 600 11px var(--font-body); text-decoration: none; cursor: pointer; }
+.foot-icon .ico { font-size: 17px; }
+.foot-icon:hover { background: var(--surface-2); color: var(--ink); }
+.foot-icon.active { background: var(--accent-soft); color: var(--accent); }
+.foot-icon:focus-visible, .me-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 main { padding: 32px clamp(16px, 4vw, 48px) 96px; max-width: 980px; width: 100%; min-width: 0; }
 .page-head { margin-bottom: 20px; }
