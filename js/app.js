@@ -770,6 +770,14 @@ window.addEventListener("hashchange", () => {
   route();
 });
 window.addEventListener("beforeunload", (e) => { if (leaveWarning) { e.preventDefault(); e.returnValue = ""; } });
+// Clicking a menu link for the page you're already on (e.g. Games after a game) reopens that page.
+document.addEventListener("click", (e) => {
+  const a = e.target.closest?.("a[data-route]");
+  if (!me || !a || a.getAttribute("href") !== location.hash || e.defaultPrevented) return;
+  e.preventDefault();
+  if (leaveWarning && !confirm(leaveWarning)) return;
+  route();
+});
 
 function route() {
   if (cleanup) { cleanup(); cleanup = null; }
