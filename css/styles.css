@@ -1215,3 +1215,15 @@ body::before {
   .bs-char { bottom: calc(31% - 4px); }
 }
 @media (prefers-reduced-motion: reduce) { .bs-char, .bs-char.hurt, .bs-char .eyes, .bs-char .arm, .bs-char .smoke, .bot-light { animation: none !important; } .bs-dmg { animation-duration: .01s; } }
+
+/* ---------------- Gifts ---------------- */
+.give-box { display: grid; gap: 10px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); margin-top: 6px; }
+.give-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: start; }
+.give-hint { display: block; margin-top: 4px; }
+.gift-card { max-width: 420px; text-align: center; justify-items: center; }
+.gift-ico { font-size: 56px; line-height: 1; animation: gift-pop .6s ease-out; }
+@keyframes gift-pop { 0% { transform: scale(.3) rotate(-20deg); opacity: 0; } 70% { transform: scale(1.15) rotate(6deg); opacity: 1; } 100% { transform: scale(1); } }
+.gift-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-weight: 600; }
+.gift-list li { padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.gift-note { font-style: italic; }
+@media (prefers-reduced-motion: reduce) { .gift-ico { animation: none; } }

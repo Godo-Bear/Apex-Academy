@@ -568,7 +568,7 @@ function playGame(view, s, extra = {}) {
     // Badges.
     const earnedBadges = store(gameKey("badges")) || {};
     const fresh = [];
-    const give = (id, ok) => { if (ok && !earnedBadges[id]) { earnedBadges[id] = todayStr(); fresh.push(GAME_BADGES.find((b) => b.id === id)); } };
+    const give = (id, ok) => { if (ok && !earnedBadges[id]) { earnedBadges[id] = new Date().toISOString(); fresh.push(GAME_BADGES.find((b) => b.id === id)); } };
     const beatFriend = mode === "challenge" && st.right > (extra.challenge?.sc ?? Infinity);
     give("first", answered > 0);
     give("combo5", st.bestCombo >= 5);
@@ -584,6 +584,7 @@ function playGame(view, s, extra = {}) {
     give("challenger", beatFriend);
     give("learner", mode === "mistakes" && answered === list.length);
     if (fresh.length) store(gameKey("badges"), earnedBadges);
+    saveGameSoon(); // badges, best scores and streak go to your account too
 
     const headline =
       mode === "millionaire" ? fmtCoins(coins)

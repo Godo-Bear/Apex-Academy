@@ -248,6 +248,7 @@ function bumpStreak() {
   const s = store(streakKey()) || {};
   if (s.last === todayStr()) return;
   store(streakKey(), { streak: s.last === yesterdayStr() ? (s.streak || 0) + 1 : 1, last: todayStr() });
+  saveGameSoon(); // keep the streak on your account too
 }
 
 function recordResults(results, { isTest = false } = {}) {
@@ -500,6 +501,7 @@ async function handleAuthenticatedUser(user) {
     paidUntil: profile.paid_until || null,
     showPoints: profile.show_points !== false,
   };
+  try { await fetchGameData(user.id); cloudGame = true; } catch (e) { cloudGame = false; } // needs supabase/game-data.sql
   await loadCustomQuestions();
   enterApp();
 }
@@ -609,6 +611,7 @@ function showLoginNotices() {
       queue.push((next) => { store(shownKey, todayStr()); showRenewReminder(daysLeft, next); });
     }
   }
+  queue.push((next) => giftsNotice(next));
   queue.push((next) => showComingUp(next));
   const run = () => { const fn = queue.shift(); if (fn) fn(run); };
   run();
@@ -2894,6 +2897,12 @@ function pageAdmin(view) {
       <div id="ev-list"></div>
     </div>
 
+    <div class="section-label">🎁 Give to everyone</div>
+    <div class="card stack">
+      <p class="muted small" style="margin:0;">Give every account points, XP, a badge, a rank, a day streak or extra time. Each person sees a gift pop-up. To give to one person, use <b>Manage → 🎁 Give / take</b> below.</p>
+      ${giveFormHTML("all")}
+    </div>
+
     <div class="section-label">Accounts</div>
     <div class="card">
       <input type="text" id="acct-search" placeholder="Search name or email" style="margin-bottom:10px;">
@@ -2920,6 +2929,7 @@ function pageAdmin(view) {
   // ----- Accounts -----
   let accounts = [];
   const open = new Set(); // account ids with their action panel expanded
+  const giving = new Set(); // account ids with the give form open
 
   function statusTag(a) {
     if (a.deleted) return `<span class="tag bad">Deleted</span>`;
@@ -2949,12 +2959,13 @@ function pageAdmin(view) {
         <div class="list-row" style="${a.deleted ? "opacity:.5;" : ""}">
           <div class="grow">
             <strong>${esc(a.username || "(no name)")}</strong>${isMe ? " (you)" : ""}${a.is_admin ? ` <span class="tag">admin</span>` : ""}
-            <div class="muted small">${esc(a.email)} · ${a.points || 0} pts · ${a.xp || 0} XP · ${attemptedOf(a.progress)} answered · seen ${timeAgo(a.last_seen)}</div>
+            <div class="muted small">${esc(a.email)} · ${a.points || 0} pts · ${a.xp || 0} XP${a.game_data ? ` · 🏅 ${Object.keys(a.game_data.badges || {}).length} badges` : ""} · ${attemptedOf(a.progress)} answered · seen ${timeAgo(a.last_seen)}</div>
           </div>
           ${statusTag(a)}
           <button class="btn ghost sm" data-toggle="${a.id}">${open.has(a.id) ? "Close" : "Manage"}</button>
           ${open.has(a.id) ? `
             <div class="row" style="flex-basis:100%; gap:6px;">
+              ${btn("give", giving.has(a.id) ? "Close gifts" : "🎁 Give / take", "")}
               ${btn("add-points", "+10 pts")}${btn("set-points", "Set pts…")}
               ${btn("add-xp", "+10 XP")}${btn("set-xp", "Set XP…")}
               ${btn("renew", "Renew 6 months")}
@@ -2962,11 +2973,44 @@ function pageAdmin(view) {
               ${btn("reset", "Reset progress")}
               ${isMe ? "" : btn("kick", a.has_paid ? "Kick" : "Unkick", "ghost")}
               ${isMe ? "" : btn("delete", "Delete account", "ghost")}
-            </div>` : ""}
+            </div>
+            ${giving.has(a.id) ? `<div style="flex-basis:100%;">${giveFormHTML(a.id)}</div>` : ""}` : ""}
         </div>`;
     }).join("") : `<p class="muted">No accounts found.</p>`;
+    $$("#accts [data-give]", view).forEach(wireGiveForm);
   }
   $("#acct-search", view).addEventListener("input", drawAccounts);
+
+  // ----- Gifts -----
+  const giveFail = (e) => (/game_data/.test(e?.message || "") ? GAME_DATA_SQL_HINT : e?.message || "Something went wrong.");
+  async function runGive(box, targets) {
+    const g = readGiveForm(box), status = $(".give-status", box), go = $("[data-give-go]", box);
+    if (["points", "xp"].includes(g.kind) && !g.amount) return toast("Enter an amount.");
+    const who = targets.length === 1 ? targets[0].username || targets[0].email : `${targets.length} accounts`;
+    if (!confirm(`Give ${giveLabel(g)} to ${who}?`)) return;
+    go.disabled = true;
+    let done = 0;
+    for (const a of targets) {
+      try {
+        Object.assign(a, await adminGive(a, g));
+        done += 1;
+        status.textContent = `Given to ${done} of ${targets.length}…`;
+      } catch (e) {
+        go.disabled = false;
+        status.textContent = "";
+        return alert(`Couldn't give to ${a.username || a.email}: ${giveFail(e)}`);
+      }
+    }
+    go.disabled = false;
+    toast(`🎁 Gave ${giveLabel(g)} to ${who}`);
+    if (targets.some((a) => a.id === authUser.id)) { const mine = targets.find((a) => a.id === authUser.id); me.points = mine.points ?? me.points; me.xp = mine.xp ?? me.xp; renderMeBox(); }
+    drawStats();
+    drawAccounts();
+    status.textContent = "";
+  }
+  wireGiveForm($('[data-give="all"]', view));
+  $('[data-give-go="all"]', view).addEventListener("click", (e) =>
+    runGive(e.target.closest("[data-give]"), accounts.filter((a) => !a.deleted)));
 
   const sixMonthsFrom = (d) => { const x = new Date(d); x.setMonth(x.getMonth() + 6); return x.toISOString(); };
   const askNumber = (label) => {
@@ -2984,9 +3028,12 @@ function pageAdmin(view) {
       open.has(id) ? open.delete(id) : open.add(id);
       return drawAccounts();
     }
+    const giveGo = e.target.closest("[data-give-go]");
+    if (giveGo) return runGive(giveGo.closest("[data-give]"), accounts.filter((x) => x.id === giveGo.dataset.giveGo));
     const btn = e.target.closest("[data-act]");
     if (!btn) return;
     const a = accounts.find((x) => x.id === btn.dataset.id);
+    if (btn.dataset.act === "give") { giving.has(a.id) ? giving.delete(a.id) : giving.add(a.id); return drawAccounts(); }
     const name = a.username || a.email;
     // Your own row may be stale if you've practised since this page loaded.
     if (a.id === authUser.id) { a.points = me.points; a.xp = me.xp; }
@@ -3037,7 +3084,8 @@ function pageAdmin(view) {
   });
 
   (async () => {
-    let { data, error } = await sb.from("profiles").select("id, username, email, points, xp, has_paid, paid_until, is_admin, progress, last_seen, deleted");
+    let { data, error } = await sb.from("profiles").select("id, username, email, points, xp, has_paid, paid_until, is_admin, progress, last_seen, deleted, game_data");
+    if (error) ({ data, error } = await sb.from("profiles").select("id, username, email, points, xp, has_paid, paid_until, is_admin, progress, last_seen, deleted"));
     if (error) ({ data, error } = await sb.from("profiles").select("id, username, email, points, xp, has_paid, paid_until, is_admin, progress"));
     if (error) { $("#accts", view).innerHTML = `<p class="muted">Couldn't load accounts.</p>`; return; }
     accounts = (data || []).sort((x, y) => (!!x.deleted - !!y.deleted) || (y.points || 0) - (x.points || 0));
