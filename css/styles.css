@@ -1169,7 +1169,7 @@ body::before {
 :root { --bs-sky1: #8fcfe6; --bs-sky2: #dff3f8; --bs-far: #a9d3e0; --bs-mid: #7db7c9; --bs-cliff: #e9f1f5; --bs-cliff-side: #b9ccd6; --bs-mist: #eaf7fb; --bs-text: #12324a; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bs-sky1: #22324a; --bs-sky2: #4d5f7c; --bs-far: #3c4d68; --bs-mid: #2f3e56; --bs-cliff: #c9d3dc; --bs-cliff-side: #7d8b99; --bs-mist: #5b6b85; --bs-text: #f1f4f8; } }
 :root[data-theme="dark"] { --bs-sky1: #22324a; --bs-sky2: #4d5f7c; --bs-far: #3c4d68; --bs-mid: #2f3e56; --bs-cliff: #c9d3dc; --bs-cliff-side: #7d8b99; --bs-mist: #5b6b85; --bs-text: #f1f4f8; }
-.boss-scene { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.18); height: clamp(170px, 30vw, 280px); margin-bottom: 10px; border-radius: var(--radius); overflow: hidden; background: linear-gradient(180deg, var(--bs-sky1), var(--bs-sky2)); }
+.boss-scene { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.18); height: clamp(190px, 32vw, 300px); margin-bottom: 10px; border-radius: var(--radius); overflow: hidden; background: linear-gradient(180deg, var(--bs-sky1), var(--bs-sky2)); }
 .bs-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .bs-far { fill: var(--bs-far); opacity: .7; }
 .bs-mid { fill: var(--bs-mid); opacity: .75; }
@@ -1182,8 +1182,8 @@ body::before {
 .bs-hud .hp { background: rgba(255,255,255,.55); height: 10px; }
 .bs-char { position: absolute; bottom: calc(31% - 6px); line-height: 0; transform-origin: 50% 100%; animation: bs-idle 2.4s ease-in-out infinite; }
 .bs-char svg { display: block; width: 100%; height: auto; overflow: visible; }
-.bs-player { left: 20%; width: clamp(54px, 8.5vw, 92px); }
-.bs-enemy { left: 58%; width: clamp(96px, 15vw, 160px); animation-delay: -1.2s; }
+.bs-player { left: 20%; width: clamp(54px, 8.5vw, 96px); }
+.bs-enemy { left: 57%; width: clamp(90px, 14vw, 150px); animation-delay: -1.2s; }
 @keyframes bs-idle { 50% { transform: translateY(-4px) scaleY(1.02); } }
 .bs-char .arm { transform-box: view-box; }
 .bs-player.throw .arm { animation: bs-arm-p .4s ease-out; }
@@ -1193,6 +1193,9 @@ body::before {
 .bs-char .eyes { transform-box: view-box; animation: bs-blink 4.5s infinite; }
 @keyframes bs-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
 .bot-light { animation: bs-light 1s steps(2) infinite; }
+.bs-char .smoke { transform-box: fill-box; transform-origin: center; animation: bs-smoke 2.6s ease-out infinite; }
+.bs-char .smoke.s2 { animation-delay: -1.3s; }
+@keyframes bs-smoke { 0% { opacity: 0; transform: translate(6px, 6px) scale(.5); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(-6px, -14px) scale(1.4); } }
 @keyframes bs-light { 50% { opacity: .3; } }
 .bs-char.hurt { animation: bs-hurt .5s ease-out, bs-idle 2.4s ease-in-out .5s infinite; }
 @keyframes bs-hurt { 20% { transform: translateX(10px) rotate(6deg); filter: brightness(2) saturate(.3); } 50% { transform: translateX(-8px) rotate(-4deg); } }
@@ -1206,9 +1209,9 @@ body::before {
 @keyframes bs-dmg { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -36px); } }
 .bs-msg { position: absolute; left: 0; right: 0; bottom: 8%; text-align: center; font-weight: 800; font-size: clamp(14px, 2vw, 18px); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45); pointer-events: none; }
 @media (max-width: 560px) {
-  .bs-hud { top: 8px; width: 42%; grid-template-columns: 1fr auto; gap: 2px 6px; font-size: 11px; }
+  .bs-hud { top: 6px; width: 42%; grid-template-columns: 1fr auto; gap: 2px 6px; font-size: 11px; }
   .bs-hud b { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bs-hud.you { left: 10px; } .bs-hud.boss { right: 10px; }
   .bs-char { bottom: calc(31% - 4px); }
 }
-@media (prefers-reduced-motion: reduce) { .bs-char, .bs-char.hurt, .bs-char .eyes, .bs-char .arm, .bot-light { animation: none !important; } .bs-dmg { animation-duration: .01s; } }
+@media (prefers-reduced-motion: reduce) { .bs-char, .bs-char.hurt, .bs-char .eyes, .bs-char .arm, .bs-char .smoke, .bot-light { animation: none !important; } .bs-dmg { animation-duration: .01s; } }

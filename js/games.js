@@ -342,6 +342,7 @@ function playGame(view, s, extra = {}) {
     bar.classList.toggle("low", timedQ || timedTotal ? frac <= 0.25 : st.total <= 10);
   }
   function drawBoss() {
+    if (!$("#g-hp-boss", view)) return; // the game has already ended
     $("#g-hp-boss", view).style.width = `${(st.bossHP / BOSS_HP) * 100}%`;
     $("#g-hp-you", view).style.width = `${(st.hp / PLAYER_HP) * 100}%`;
     $("#g-hp-boss-n", view).textContent = `${st.bossHP} HP`;
@@ -370,6 +371,7 @@ function playGame(view, s, extra = {}) {
     fromEl.classList.remove("throw"); void fromEl.offsetWidth; fromEl.classList.add("throw");
     anim.onfinish = () => {
       p.remove();
+      if (!scene.isConnected) return; // the results are already showing
       toEl.classList.remove("hurt"); void toEl.offsetWidth; toEl.classList.add("hurt");
       const dmg = document.createElement("span");
       dmg.className = `bs-dmg ${cls}`;
@@ -378,8 +380,8 @@ function playGame(view, s, extra = {}) {
       scene.appendChild(dmg);
       setTimeout(() => dmg.remove(), 1000);
       drawBoss();
-      if (st.bossHP <= 0) $("#g-enemy", view).classList.add("ko");
-      if (st.hp <= 0) $("#g-player", view).classList.add("ko");
+      if (st.bossHP <= 0) $("#g-enemy", view)?.classList.add("ko");
+      if (st.hp <= 0) $("#g-player", view)?.classList.add("ko");
     };
   }
   function drawLadder() {
@@ -489,7 +491,7 @@ function playGame(view, s, extra = {}) {
     if (mode === "boss") {
       if (correct) st.bossHP = Math.max(0, st.bossHP - (BOSS_HIT[q.difficulty] || 15));
       else st.hp = Math.max(0, st.hp - PLAYER_HIT);
-      const shot = correct ? String(yourAnswerText(q, raw) || "✓") : "🔥";
+      const shot = correct ? (isVisualInput(q) ? "⭐" : String(yourAnswerText(q, raw) || "⭐")) : "🔥";
       throwAt(correct ? $("#g-player", view) : $("#g-enemy", view), correct ? $("#g-enemy", view) : $("#g-player", view),
         correct ? (shot.length > 18 ? shot.slice(0, 17) + "…" : shot) : "🔥", correct ? "good" : "bad",
         correct ? (BOSS_HIT[q.difficulty] || 15) : PLAYER_HIT);
