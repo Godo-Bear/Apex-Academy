@@ -119,87 +119,101 @@ setInterval(async () => {
 }, 60 * 1000);
 
 // ---------------- Admin: give things ----------------
-const GIVE_KINDS = [
-  ["points", "✦ Points"], ["xp", "⚡ XP"], ["badge", "🏅 A badge"], ["badge-removed", "🔒 Remove a badge"],
-  ["rank", "🎖️ A rank"], ["streak", "🔥 Day streak"], ["months", "📅 Extra paid time"],
+// The give box is a checklist: tick as many things as you like, then give them all at once.
+const GIVE_ROWS = [
+  { kind: "points", label: "✦ Points", hint: "Use a minus number to take some away." },
+  { kind: "xp", label: "⚡ XP", hint: "Use a minus number to take some away." },
+  { kind: "badge", label: "🏅 Give badges" },
+  { kind: "badge-removed", label: "🔒 Take badges away" },
+  { kind: "rank", label: "🎖️ Set rank" },
+  { kind: "streak", label: "🔥 Set day streak" },
+  { kind: "months", label: "📅 Extra paid time" },
 ];
 
 function giveFormHTML(key) {
-  const badgeOpts = (typeof GAME_BADGES !== "undefined" ? GAME_BADGES : []).map((b) => `<option value="${b.id}">${b.icon} ${esc(b.name)}</option>`).join("");
+  const badgeChips = (kind) => (typeof GAME_BADGES !== "undefined" ? GAME_BADGES : []).map((b) =>
+    `<label class="chip-check sm"><input type="checkbox" class="give-badge" value="${b.id}"> ${b.icon} ${esc(b.name)}</label>`).join("");
+  const control = (r) => {
+    const id = `g-${r.kind}-${key}`;
+    if (r.kind === "points" || r.kind === "xp") return `<input type="number" id="${id}" class="give-amount" value="100" step="1" aria-label="${r.label} amount">`;
+    if (r.kind === "streak") return `<input type="number" id="${id}" class="give-amount" value="7" min="0" step="1" aria-label="Days"> <span class="muted small">days</span>`;
+    if (r.kind === "rank") return `<select id="${id}" class="give-rank" aria-label="Rank">${XP_LEVELS.map((l) => `<option value="${esc(l.name)}">${l.icon} ${esc(l.name)} (${l.min} XP)</option>`).join("")}</select>`;
+    if (r.kind === "months") return `<select id="${id}" class="give-months" aria-label="Extra time">${[1, 2, 3, 6, 12].map((m) => `<option value="${m}">${m} month${m === 1 ? "" : "s"}</option>`).join("")}</select>`;
+    return `<span class="muted small give-closed">Tick to choose badges</span><div class="checklist give-badges">${badgeChips(r.kind)}</div>`;
+  };
   return `
     <div class="give-box" data-give="${key}">
-      <div class="give-grid">
-        <div><label class="field" for="gk-${key}">Give</label>
-          <select id="gk-${key}" class="give-kind">${GIVE_KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>
-        <div class="give-f give-amount-f"><label class="field" for="ga-${key}">Amount</label>
-          <input type="number" id="ga-${key}" class="give-amount" value="100" step="1">
-          <span class="muted small give-hint">Use a minus number to take some away.</span></div>
-        <div class="give-f give-badge-f hidden"><label class="field" for="gb-${key}">Badge</label><select id="gb-${key}" class="give-badge">${badgeOpts}</select></div>
-        <div class="give-f give-rank-f hidden"><label class="field" for="gr-${key}">Rank</label>
-          <select id="gr-${key}" class="give-rank">${XP_LEVELS.map((l) => `<option value="${esc(l.name)}">${l.icon} ${esc(l.name)} (${l.min} XP)</option>`).join("")}</select></div>
-        <div class="give-f give-months-f hidden"><label class="field" for="gm-${key}">Time</label>
-          <select id="gm-${key}" class="give-months">${[1, 2, 3, 6, 12].map((m) => `<option value="${m}">${m} month${m === 1 ? "" : "s"}</option>`).join("")}</select></div>
-      </div>
+      <span class="field" style="margin:0;">Tick everything you want to give or take away</span>
+      ${GIVE_ROWS.map((r) => `
+        <div class="give-row" data-kind="${r.kind}">
+          <label class="give-tick"><input type="checkbox" class="give-on"> ${r.label}</label>
+          <div class="give-ctl">${control(r)}${r.hint ? `<span class="muted small give-hint">${r.hint}</span>` : ""}</div>
+        </div>`).join("")}
       <div><label class="field" for="gn-${key}">Message <span class="muted">(optional, shown with the gift)</span></label>
         <input type="text" id="gn-${key}" class="give-note" maxlength="120" placeholder="e.g. Great work on your test!"></div>
       <div class="row"><button class="btn sm" type="button" data-give-go="${key}">🎁 Give</button><span class="small muted give-status"></span></div>
     </div>`;
 }
 
-// Shows only the boxes that suit what's being given.
+// Ticking a row shows its options; changing an option ticks its row.
 function wireGiveForm(box) {
-  const kind = $(".give-kind", box);
-  const draw = () => {
-    const k = kind.value;
-    $(".give-amount-f", box).classList.toggle("hidden", !["points", "xp", "streak"].includes(k));
-    $(".give-hint", box).classList.toggle("hidden", k === "streak");
-    $(".give-badge-f", box).classList.toggle("hidden", !k.startsWith("badge"));
-    $(".give-rank-f", box).classList.toggle("hidden", k !== "rank");
-    $(".give-months-f", box).classList.toggle("hidden", k !== "months");
-    if (k === "streak" && +$(".give-amount", box).value === 100) $(".give-amount", box).value = 7;
-  };
-  kind.addEventListener("change", draw);
-  draw();
+  $$(".give-row", box).forEach((row) => {
+    const on = $(".give-on", row), ctl = $(".give-ctl", row);
+    const draw = () => { row.classList.toggle("on", on.checked); };
+    on.addEventListener("change", draw);
+    ctl.addEventListener("input", () => { on.checked = row.dataset.kind.startsWith("badge") ? $$(".give-badge:checked", row).length > 0 || on.checked : true; draw(); });
+    ctl.addEventListener("change", () => { if (row.dataset.kind.startsWith("badge") && !$$(".give-badge:checked", row).length) on.checked = false; else on.checked = true; draw(); });
+    draw();
+  });
 }
 
+// Everything ticked, as a list of gifts. Rank goes before XP so "set rank, then +XP" adds on top.
 function readGiveForm(box) {
-  return {
-    kind: $(".give-kind", box).value,
-    amount: parseInt($(".give-amount", box).value, 10) || 0,
-    badge: $(".give-badge", box).value,
-    rank: $(".give-rank", box).value,
-    months: +$(".give-months", box).value,
-    note: $(".give-note", box).value.trim(),
-  };
+  const items = [];
+  $$(".give-row", box).forEach((row) => {
+    if (!$(".give-on", row).checked) return;
+    const kind = row.dataset.kind;
+    if (kind === "points" || kind === "xp" || kind === "streak") items.push({ kind, amount: parseInt($(".give-amount", row).value, 10) || 0 });
+    if (kind === "rank") items.push({ kind, rank: $(".give-rank", row).value });
+    if (kind === "months") items.push({ kind, months: +$(".give-months", row).value });
+    if (kind.startsWith("badge")) $$(".give-badge:checked", row).forEach((b) => items.push({ kind, badge: b.value }));
+  });
+  items.sort((a, b) => (a.kind === "rank" ? -1 : b.kind === "rank" ? 1 : 0));
+  return { items, note: $(".give-note", box).value.trim() };
 }
 
-// Gives one thing to one account. Returns the profile fields that changed.
-async function adminGive(account, g) {
+// Gives a list of things to one account in one save. Returns the profile fields that changed.
+async function adminGive(account, items, note = "") {
   const { data, error } = await sb.from("profiles").select("game_data, points, xp, paid_until").eq("id", account.id).single();
   if (error) throw error;
   const game = { ...(data.game_data || {}) };
-  const gift = { kind: g.kind, at: new Date().toISOString(), from: me.name, ...(g.note ? { note: g.note } : {}) };
   const update = {};
-  switch (g.kind) {
-    case "points": update.points = Math.max(0, (data.points || 0) + g.amount); gift.amount = g.amount; break;
-    case "xp": update.xp = Math.max(0, (data.xp || 0) + g.amount); gift.amount = g.amount; break;
-    case "badge": {
-      game.badges = { ...(game.badges || {}), [g.badge]: gift.at };
-      const r = { ...(game.removed || {}) }; delete r[g.badge]; game.removed = r; gift.badge = g.badge; break;
+  let points = data.points || 0, xp = data.xp || 0;
+  const at = new Date().toISOString();
+  const gifts = items.map((g, i) => {
+    const gift = { kind: g.kind, at, from: me.name, ...(note && i === 0 ? { note } : {}) };
+    switch (g.kind) {
+      case "points": points = Math.max(0, points + g.amount); update.points = points; gift.amount = g.amount; break;
+      case "xp": xp = Math.max(0, xp + g.amount); update.xp = xp; gift.amount = g.amount; break;
+      case "rank": xp = XP_LEVELS.find((l) => l.name === g.rank)?.min ?? xp; update.xp = xp; gift.rank = g.rank; break;
+      case "badge": {
+        game.badges = { ...(game.badges || {}), [g.badge]: at };
+        const r = { ...(game.removed || {}) }; delete r[g.badge]; game.removed = r; gift.badge = g.badge; break;
+      }
+      case "badge-removed": {
+        const b = { ...(game.badges || {}) }; delete b[g.badge]; game.badges = b;
+        game.removed = { ...(game.removed || {}), [g.badge]: at }; gift.badge = g.badge; break;
+      }
+      case "streak": game.streak = { streak: Math.max(0, g.amount), last: todayStr() }; gift.amount = Math.max(0, g.amount); break;
+      case "months": {
+        const from = (update.paid_until || data.paid_until) && new Date(update.paid_until || data.paid_until) > new Date() ? new Date(update.paid_until || data.paid_until) : new Date();
+        from.setMonth(from.getMonth() + g.months);
+        update.paid_until = from.toISOString(); update.has_paid = true; gift.amount = g.months; break;
+      }
     }
-    case "badge-removed": {
-      const b = { ...(game.badges || {}) }; delete b[g.badge]; game.badges = b;
-      game.removed = { ...(game.removed || {}), [g.badge]: gift.at }; gift.badge = g.badge; break;
-    }
-    case "rank": update.xp = XP_LEVELS.find((l) => l.name === g.rank)?.min ?? data.xp; gift.rank = g.rank; break;
-    case "streak": game.streak = { streak: Math.max(0, g.amount), last: todayStr() }; gift.amount = Math.max(0, g.amount); break;
-    case "months": {
-      const from = data.paid_until && new Date(data.paid_until) > new Date() ? new Date(data.paid_until) : new Date();
-      from.setMonth(from.getMonth() + g.months);
-      update.paid_until = from.toISOString(); update.has_paid = true; gift.amount = g.months; break;
-    }
-  }
-  game.gifts = [...(Array.isArray(game.gifts) ? game.gifts : []), gift].slice(-30);
+    return gift;
+  });
+  game.gifts = [...(Array.isArray(game.gifts) ? game.gifts : []), ...gifts].slice(-40);
   update.game_data = game;
   const { error: e2 } = await sb.from("profiles").update(update).eq("id", account.id);
   if (e2) throw e2;
@@ -207,5 +221,21 @@ async function adminGive(account, g) {
   return update;
 }
 
-const giveLabel = (g) => giftLine({ ...g, amount: g.kind === "months" ? g.months : g.amount }).replace(/^\S+\s/, "");
+// Short wording for the admin's confirm and "done" messages, e.g. "+100 points, Master rank, On fire badge".
+function giveLabel(items) {
+  const sign = (n) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
+  return items.map((g) => {
+    const b = giftBadge(g.badge)?.name || g.badge;
+    switch (g.kind) {
+      case "points": return `${sign(g.amount)} points`;
+      case "xp": return `${sign(g.amount)} XP`;
+      case "badge": return `${b} badge`;
+      case "badge-removed": return `remove ${b} badge`;
+      case "rank": return `${g.rank} rank`;
+      case "streak": return `${g.amount}-day streak`;
+      case "months": return `+${g.months} month${g.months === 1 ? "" : "s"} access`;
+      default: return g.kind;
+    }
+  }).join(", ");
+}
 const GAME_DATA_SQL_HINT = "Run supabase/game-data.sql in Supabase first (it adds the game_data column).";

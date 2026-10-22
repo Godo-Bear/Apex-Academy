@@ -2897,9 +2897,13 @@ function pageAdmin(view) {
       <div id="ev-list"></div>
     </div>
 
-    <div class="section-label">🎁 Give to everyone</div>
+    <div class="section-label">🎁 Give to lots of people</div>
     <div class="card stack">
-      <p class="muted small" style="margin:0;">Give every account points, XP, a badge, a rank, a day streak or extra time. Each person sees a gift pop-up. To give to one person, use <b>Manage → 🎁 Give / take</b> below.</p>
+      <p class="muted small" style="margin:0;">Give or take points, XP, badges, a rank, a day streak or extra time. Each person sees a gift pop-up. To give to just one person, use <b>Manage → 🎁 Give / take</b> below.</p>
+      <div class="segmented" id="give-who" role="radiogroup" aria-label="Who gets it">
+        <button type="button" class="active" data-who="all">Everyone</button>
+        <button type="button" data-who="ticked">People I tick below (<span id="give-n">0</span>)</button>
+      </div>
       ${giveFormHTML("all")}
     </div>
 
@@ -2930,6 +2934,8 @@ function pageAdmin(view) {
   let accounts = [];
   const open = new Set(); // account ids with their action panel expanded
   const giving = new Set(); // account ids with the give form open
+  const picked = new Set(); // account ids ticked for "Give to lots of people"
+  let giveWho = "all";
 
   function statusTag(a) {
     if (a.deleted) return `<span class="tag bad">Deleted</span>`;
@@ -2957,6 +2963,7 @@ function pageAdmin(view) {
       const btn = (act, label, cls = "secondary") => `<button class="btn ${cls} sm" data-act="${act}" data-id="${a.id}">${label}</button>`;
       return `
         <div class="list-row" style="${a.deleted ? "opacity:.5;" : ""}">
+          ${a.deleted ? "" : `<input type="checkbox" class="pick-acct" data-pick="${a.id}" aria-label="Tick ${esc(a.username || a.email)} for gifts"${picked.has(a.id) ? " checked" : ""}>`}
           <div class="grow">
             <strong>${esc(a.username || "(no name)")}</strong>${isMe ? " (you)" : ""}${a.is_admin ? ` <span class="tag">admin</span>` : ""}
             <div class="muted small">${esc(a.email)} · ${a.points || 0} pts · ${a.xp || 0} XP${a.game_data ? ` · 🏅 ${Object.keys(a.game_data.badges || {}).length} badges` : ""} · ${attemptedOf(a.progress)} answered · seen ${timeAgo(a.last_seen)}</div>
@@ -2984,15 +2991,18 @@ function pageAdmin(view) {
   // ----- Gifts -----
   const giveFail = (e) => (/game_data/.test(e?.message || "") ? GAME_DATA_SQL_HINT : e?.message || "Something went wrong.");
   async function runGive(box, targets) {
-    const g = readGiveForm(box), status = $(".give-status", box), go = $("[data-give-go]", box);
-    if (["points", "xp"].includes(g.kind) && !g.amount) return toast("Enter an amount.");
-    const who = targets.length === 1 ? targets[0].username || targets[0].email : `${targets.length} accounts`;
-    if (!confirm(`Give ${giveLabel(g)} to ${who}?`)) return;
+    const { items, note } = readGiveForm(box), status = $(".give-status", box), go = $("[data-give-go]", box);
+    if (!items.length) return toast("Tick at least one thing to give.");
+    if (items.some((g) => ["points", "xp"].includes(g.kind) && !g.amount)) return toast("Enter an amount for points or XP.");
+    if (!targets.length) return toast("Tick at least one person in the list below.");
+    const who = targets.length === 1 ? targets[0].username || targets[0].email : `${targets.length} people`;
+    const label = giveLabel(items);
+    if (!confirm(`Give ${who}: ${label}?`)) return;
     go.disabled = true;
     let done = 0;
     for (const a of targets) {
       try {
-        Object.assign(a, await adminGive(a, g));
+        Object.assign(a, await adminGive(a, items, note));
         done += 1;
         status.textContent = `Given to ${done} of ${targets.length}…`;
       } catch (e) {
@@ -3002,7 +3012,7 @@ function pageAdmin(view) {
       }
     }
     go.disabled = false;
-    toast(`🎁 Gave ${giveLabel(g)} to ${who}`);
+    toast(`🎁 Done! ${who}: ${label}`);
     if (targets.some((a) => a.id === authUser.id)) { const mine = targets.find((a) => a.id === authUser.id); me.points = mine.points ?? me.points; me.xp = mine.xp ?? me.xp; renderMeBox(); }
     drawStats();
     drawAccounts();
@@ -3010,7 +3020,18 @@ function pageAdmin(view) {
   }
   wireGiveForm($('[data-give="all"]', view));
   $('[data-give-go="all"]', view).addEventListener("click", (e) =>
-    runGive(e.target.closest("[data-give]"), accounts.filter((a) => !a.deleted)));
+    runGive(e.target.closest("[data-give]"), accounts.filter((a) => !a.deleted && (giveWho === "all" || picked.has(a.id)))));
+  $$("#give-who [data-who]", view).forEach((b) => b.addEventListener("click", () => {
+    giveWho = b.dataset.who;
+    $$("#give-who [data-who]", view).forEach((x) => x.classList.toggle("active", x === b));
+  }));
+  $("#accts", view).addEventListener("change", (e) => {
+    const box = e.target.closest("[data-pick]");
+    if (!box) return;
+    box.checked ? picked.add(box.dataset.pick) : picked.delete(box.dataset.pick);
+    $("#give-n", view).textContent = picked.size;
+    if (picked.size && giveWho !== "ticked") $('#give-who [data-who="ticked"]', view).click();
+  });
 
   const sixMonthsFrom = (d) => { const x = new Date(d); x.setMonth(x.getMonth() + 6); return x.toISOString(); };
   const askNumber = (label) => {

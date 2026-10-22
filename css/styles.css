@@ -1218,7 +1218,6 @@ body::before {
 
 /* ---------------- Gifts ---------------- */
 .give-box { display: grid; gap: 10px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); margin-top: 6px; }
-.give-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: start; }
 .give-hint { display: block; margin-top: 4px; }
 .gift-card { max-width: 420px; text-align: center; justify-items: center; }
 .gift-ico { font-size: 56px; line-height: 1; animation: gift-pop .6s ease-out; }
@@ -1227,3 +1226,17 @@ body::before {
 .gift-list li { padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 .gift-note { font-style: italic; }
 @media (prefers-reduced-motion: reduce) { .gift-ico { animation: none; } }
+.give-row { display: grid; grid-template-columns: minmax(150px, 190px) 1fr; gap: 6px 12px; align-items: start; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.give-row.on { border-color: var(--accent); background: var(--accent-soft); }
+.give-tick { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; cursor: pointer; padding-top: 6px; }
+.give-tick input, .pick-acct { accent-color: var(--accent); width: 16px; height: 16px; }
+.give-ctl { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; min-width: 0; opacity: .55; }
+.give-row.on .give-ctl { opacity: 1; }
+.give-ctl input[type="number"] { max-width: 140px; }
+.give-ctl .give-hint { flex-basis: 100%; margin: 0; }
+.give-badges { gap: 6px; }
+.chip-check.sm { padding: 5px 10px; font-size: 13px; }
+@media (max-width: 560px) { .give-row { grid-template-columns: 1fr; } .give-tick { padding-top: 0; } }
+.give-row:not(.on) .give-badges { display: none; }
+.give-row.on .give-closed { display: none; }
+.give-closed { padding-top: 6px; }
