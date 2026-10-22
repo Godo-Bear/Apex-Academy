@@ -289,7 +289,24 @@ function playGame(view, s, extra = {}) {
       <div class="g-title"><span class="g-ico">${MODE_ICONS[mode]}</span><div><b>${MODE_NAMES[mode]}</b><span class="muted small">${subject.icon} ${subject.name}</span></div></div>
       <div class="g-stats" id="g-stats"></div>
     </div>
-    ${mode === "boss" ? `<div class="card boss-arena" id="g-boss"></div>` : ""}
+    ${mode === "boss" ? `
+    <div class="boss-scene" id="g-boss">
+      <svg class="bs-bg" viewBox="0 0 800 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+        <path class="bs-far" d="M0 170 L60 120 L110 150 L170 70 L230 140 L300 95 L360 150 L430 60 L500 130 L560 90 L620 145 L690 75 L760 130 L800 110 V300 H0 Z"/>
+        <path class="bs-mid" d="M0 230 L70 180 L120 210 L190 160 L260 220 L640 225 L700 170 L760 200 L800 185 V300 H0 Z"/>
+        <defs><linearGradient id="bs-mist-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--bs-mist)" stop-opacity="0"/><stop offset="1" stop-color="var(--bs-mist)" stop-opacity=".9"/></linearGradient></defs>
+        <path class="bs-cliff-side" d="M78 222 Q360 206 652 214 L640 236 Q610 262 560 276 Q500 300 420 300 L300 300 Q220 292 170 270 Q120 252 92 238 Z"/>
+        <path class="bs-cliff-shade" d="M180 262 Q300 284 420 282 Q520 280 600 252 L560 276 Q500 300 420 300 L300 300 Q220 292 170 270 Z"/>
+        <path class="bs-cliff-top" d="M66 216 Q360 186 664 204 L656 220 Q360 204 76 232 Z"/>
+        <path class="bs-crack" d="M300 226 L292 252 L304 272 M480 220 L488 246 L478 264"/>
+        <rect x="0" y="200" width="800" height="100" fill="url(#bs-mist-g)"/>
+      </svg>
+      <div class="bs-hud you"><b>You</b><div class="hp"><div class="hp-fill you" id="g-hp-you"></div></div><span id="g-hp-you-n"></span></div>
+      <div class="bs-hud boss"><b>Boss</b><div class="hp"><div class="hp-fill boss" id="g-hp-boss"></div></div><span id="g-hp-boss-n"></span></div>
+      <div class="bs-char bs-player" id="g-player"><span>🧑‍🎓</span></div>
+      <div class="bs-char bs-enemy" id="g-enemy"><span>${st.boss}</span></div>
+      <div class="bs-msg" id="g-bs-msg">Answer questions to attack!</div>
+    </div>` : ""}
     ${mode === "millionaire" ? `<div class="card ladder-bar" id="g-ladder"></div>` : ""}
     <div class="time-bar hidden" id="g-bar"><div></div></div>
     <div class="game-stage">
@@ -301,6 +318,8 @@ function playGame(view, s, extra = {}) {
       <span class="muted small">Press Enter to check your answer.</span>
     </div>`;
   const form = $("#g-form", view), stats = $("#g-stats", view), bar = $("#g-bar", view);
+  window.scrollTo(0, 0);
+  if (mode === "boss") drawBoss();
 
   function drawStats() {
     const combo = st.combo >= 2 ? `<span class="pill-stat combo">🔥 x${st.combo}</span>` : "";
@@ -316,7 +335,6 @@ function playGame(view, s, extra = {}) {
     else if (mode === "millionaire") html = `<span class="pill-stat">Question <b>${Math.min(st.step + 1, 15)}/15</b></span><span class="pill-stat">For <b>${fmtCoins(LADDER[Math.min(st.step, 14)])}</b></span>${combo}`;
     stats.innerHTML = html + pause;
     $("#g-pause", stats)?.addEventListener("click", togglePause);
-    if (mode === "boss") drawBoss();
     if (mode === "millionaire") drawLadder();
   }
   function drawBar() {
@@ -324,12 +342,46 @@ function playGame(view, s, extra = {}) {
     $("div", bar).style.width = `${Math.max(0, frac) * 100}%`;
     bar.classList.toggle("low", timedQ || timedTotal ? frac <= 0.25 : st.total <= 10);
   }
-  function drawBoss(hit) {
-    const box = $("#g-boss", view);
-    box.innerHTML = `
-      <div class="fighter"><span class="f-ico${hit === "boss" ? " hit" : ""}">${st.boss}</span><div class="hp"><div class="hp-fill boss" style="width:${(st.bossHP / BOSS_HP) * 100}%"></div></div><span class="small">Boss · ${st.bossHP} HP</span></div>
-      <span class="vs">VS</span>
-      <div class="fighter"><span class="f-ico${hit === "you" ? " hit" : ""}">🧑‍🎓</span><div class="hp"><div class="hp-fill you" style="width:${(st.hp / PLAYER_HP) * 100}%"></div></div><span class="small">You · ${st.hp} HP</span></div>`;
+  function drawBoss() {
+    $("#g-hp-boss", view).style.width = `${(st.bossHP / BOSS_HP) * 100}%`;
+    $("#g-hp-you", view).style.width = `${(st.hp / PLAYER_HP) * 100}%`;
+    $("#g-hp-boss-n", view).textContent = `${st.bossHP} HP`;
+    $("#g-hp-you-n", view).textContent = `${st.hp} HP`;
+  }
+  // Throws something from one fighter to the other in an arc, then shows the hit.
+  function throwAt(fromEl, toEl, label, cls, damage) {
+    const scene = $("#g-boss", view);
+    if (!scene) return;
+    const sr = scene.getBoundingClientRect(), a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+    const p = document.createElement("span");
+    p.className = `bs-shot ${cls}`;
+    p.textContent = label;
+    scene.appendChild(p);
+    const x0 = a.left + a.width / 2 - sr.left, y0 = a.top + a.height * 0.35 - sr.top;
+    const x1 = b.left + b.width / 2 - sr.left, y1 = b.top + b.height * 0.4 - sr.top;
+    const lift = Math.max(40, Math.abs(x1 - x0) * 0.25);
+    const at = (x, y, r) => `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${r}deg)`;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const anim = p.animate([
+      { transform: at(x0, y0, 0), opacity: 0 },
+      { transform: at(x0, y0, 0), opacity: 1, offset: 0.08 },
+      { transform: at((x0 + x1) / 2, Math.min(y0, y1) - lift, 180), offset: 0.5 },
+      { transform: at(x1, y1, 360), opacity: 1 },
+    ], { duration: reduce ? 1 : 650, easing: "cubic-bezier(.3,.1,.5,1)", fill: "forwards" });
+    fromEl.classList.remove("throw"); void fromEl.offsetWidth; fromEl.classList.add("throw");
+    anim.onfinish = () => {
+      p.remove();
+      toEl.classList.remove("hurt"); void toEl.offsetWidth; toEl.classList.add("hurt");
+      const dmg = document.createElement("span");
+      dmg.className = `bs-dmg ${cls}`;
+      dmg.textContent = `−${damage}`;
+      dmg.style.left = `${x1}px`; dmg.style.top = `${y1 - 30}px`;
+      scene.appendChild(dmg);
+      setTimeout(() => dmg.remove(), 1000);
+      drawBoss();
+      if (st.bossHP <= 0) $("#g-enemy", view).classList.add("ko");
+      if (st.hp <= 0) $("#g-player", view).classList.add("ko");
+    };
   }
   function drawLadder() {
     const safe = SAFE_STEPS.filter((n) => st.step >= n).pop();
@@ -438,7 +490,11 @@ function playGame(view, s, extra = {}) {
     if (mode === "boss") {
       if (correct) st.bossHP = Math.max(0, st.bossHP - (BOSS_HIT[q.difficulty] || 15));
       else st.hp = Math.max(0, st.hp - PLAYER_HIT);
-      drawBoss(correct ? "boss" : "you");
+      const shot = correct ? String(yourAnswerText(q, raw) || "✓") : "🔥";
+      throwAt(correct ? $("#g-player", view) : $("#g-enemy", view), correct ? $("#g-enemy", view) : $("#g-player", view),
+        correct ? (shot.length > 18 ? shot.slice(0, 17) + "…" : shot) : "🔥", correct ? "good" : "bad",
+        correct ? (BOSS_HIT[q.difficulty] || 15) : PLAYER_HIT);
+      $("#g-bs-msg", view).textContent = correct ? "Direct hit!" : "Ouch! The boss hit back.";
       if (st.bossHP <= 0) { done = true; st.won = true; why = "You defeated the boss! 🎉"; }
       else if (st.hp <= 0) { done = true; why = "The boss knocked you out. Try again!"; }
     }
