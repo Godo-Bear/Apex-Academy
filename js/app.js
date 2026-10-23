@@ -2462,6 +2462,7 @@ function pageTutor(view) {
           <strong class="tutor-title" id="t-title"></strong>
           <button class="btn ghost sm tutor-new" type="button" data-new-chat title="Start a new chat">＋ New</button>
         </div>
+        <div class="tutor-fb">${feedbackPickerHTML("How the tutor talks when it checks your work or a photo of your working.")}</div>
         <div class="chat" id="chat"><p class="muted small" style="margin:auto;">Loading your chats…</p></div>
         <div class="attach-preview hidden" id="attach"><img alt=""><button class="btn ghost sm" id="attach-x">Remove photo</button></div>
         <form class="chat-form" id="chat-form" autocomplete="off">
