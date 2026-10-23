@@ -1252,12 +1252,50 @@ const ESSAY_TYPES = {
   discussion: { label: "Discussion", hint: "weigh up both sides" },
   informative: { label: "Informative", hint: "explain a topic clearly" },
 };
+// ---------------- AI feedback style ----------------
+// How the AI talks when it checks your work: chill and supportive, balanced, or very critical.
+// Chosen on the Test page, in writing practice or in Settings; the same choice is used everywhere.
+const FEEDBACK_STYLES = {
+  chill: { label: "😌 Chill", long: "Chill & supportive" },
+  balanced: { label: "⚖️ Balanced", long: "Balanced" },
+  critical: { label: "🔥 Critical", long: "Very critical" },
+  brutal: { label: "💀 Super critical", long: "Very, very critical" },
+};
+const feedbackStyleKey = () => `apex-feedback-style-${authUser.id}`;
+const feedbackStyle = () => (FEEDBACK_STYLES[store(feedbackStyleKey())] ? store(feedbackStyleKey()) : "balanced");
+// Extra instructions added to every AI prompt that checks or comments on the student's work.
+function feedbackTone(task = "feedback") {
+  const style = feedbackStyle();
+  if (style === "chill") return `FEEDBACK STYLE — CHILL AND SUPPORTIVE: Be relaxed, warm and upbeat, like a friendly coach. Start with what they did well and celebrate it. Keep criticism gentle and short: at most one or two small, kind suggestions, worded as "you could try…". Never sound harsh.${task === "marking" ? " Mark generously: if the answer shows the key idea, count it as correct, and ignore small spelling or wording slips." : ""}`;
+  if (style === "brutal") return `FEEDBACK STYLE — VERY, VERY CRITICAL: Be the toughest examiner possible. Hunt down every single error, however small: spelling, punctuation, grammar, word choice, missing steps, missing units, vague wording, weak reasoning, structure. List them bluntly and explain exactly how to fix each one. No praise at all unless the work is truly flawless. Hold them to a top-of-the-class standard and tell them plainly when the work isn't good enough yet. Stay respectful: criticise the work, never the person, and never be rude, insulting or mean.${task === "marking" ? " Mark extremely strictly, like a strict exam: an answer is only correct if it is complete, precise, uses the right terms and fully matches the example answer's key points; anything vague, incomplete or with a factual slip is wrong." : ""}`;
+  if (style === "critical") return `FEEDBACK STYLE — VERY CRITICAL: Be a strict, demanding teacher who pushes the student hard. Point out every mistake and weakness directly and specifically, with how to fix it. Don't sugar-coat and keep praise to a minimum (only for things that are genuinely excellent). Stay respectful: never rude, insulting or mean.${task === "marking" ? " Mark strictly: only count an answer as correct if it is complete, precise and clearly explained; vague or half-right answers are wrong." : ""}`;
+  return `FEEDBACK STYLE — BALANCED: Be fair and encouraging: mention what they did well and give clear, specific suggestions to improve.`;
+}
+function feedbackPickerHTML(note = "") {
+  const cur = feedbackStyle();
+  return `<div class="fb-style">
+    <span class="fb-style-label">AI feedback</span>
+    <div class="segmented" role="radiogroup" aria-label="AI feedback style">
+      ${Object.entries(FEEDBACK_STYLES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${k === cur}" class="${k === cur ? "active" : ""}" data-fb-style="${k}">${v.label}</button>`).join("")}
+    </div>
+    ${note ? `<span class="muted small">${note}</span>` : ""}
+  </div>`;
+}
+// One handler for every picker on the page, so they all stay in step.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-fb-style]");
+  if (!btn || !authUser) return;
+  store(feedbackStyleKey(), btn.dataset.fbStyle);
+  $$("[data-fb-style]").forEach((b) => { const on = b.dataset.fbStyle === btn.dataset.fbStyle; b.classList.toggle("active", on); b.setAttribute("aria-checked", String(on)); });
+  toast(`AI feedback: ${FEEDBACK_STYLES[btn.dataset.fbStyle].long}`);
+});
+
 function writingFeedbackPrompt(t, piece) {
   const s = piece.settings || {};
   const text = writingText(piece);
   const target = s.target ? ` They were aiming for about ${s.target} words and wrote ${countWords(text)}.` : "";
   if (t.special === "creative-writing") {
-    return `You are an encouraging Year 7 English teacher marking a piece of creative writing. The writing prompt was: "${piece.prompt}".${target}
+    return `You are a Year 7 English teacher marking a piece of creative writing. The writing prompt was: "${piece.prompt}".${target}
 
 Here is the student's writing:
 """
@@ -1269,13 +1307,15 @@ Give feedback a teacher would give on a creative writing piece, covering:
 2. Spelling — flag any misspelled words.
 3. Sentence variety and flow — are sentences too repetitive or choppy?
 4. Word choice — suggest a few stronger or more interesting words to replace plain ones.
-5. One or two things they did well, to be encouraging.
+5. Things they did well.
 6. One clear, specific suggestion for how to improve the piece overall.
 
-Keep it friendly, specific, and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.`;
+Keep it specific and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.
+
+${feedbackTone()}`;
   }
   const type = ESSAY_TYPES[s.essayType] || ESSAY_TYPES.persuasive;
-  return `You are an encouraging Year 7 English teacher marking a piece of essay writing. The essay prompt was: "${piece.prompt}"
+  return `You are a Year 7 English teacher marking a piece of essay writing. The essay prompt was: "${piece.prompt}"
 
 The student chose to write a ${type.label.toLowerCase()} essay (${type.hint})${s.side === "for" ? ", arguing FOR the topic" : s.side === "against" ? ", arguing AGAINST the topic" : ""}, with an introduction, ${s.paragraphs || 3} body paragraph${s.paragraphs === 1 ? "" : "s"} and a conclusion.${target}
 
@@ -1291,10 +1331,12 @@ Give feedback a teacher would give on an essay, covering:
 4. Evidence and reasoning — do they support their points with examples or reasons, not just opinions?
 5. Punctuation, capital letters, and spelling — point out any clear errors with brief examples.
 6. Sentence variety and word choice — suggest a few stronger words or sentence structures.
-7. One or two things they did well, to be encouraging.
+7. Things they did well.
 8. One clear, specific suggestion for how to improve the essay overall.
 
-Keep it friendly, specific, and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.`;
+Keep it specific and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.
+
+${feedbackTone()}`;
 }
 
 const DEFAULT_WRITING_SETTINGS = {
@@ -1741,6 +1783,7 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
             <button class="btn" id="get-fb">Get AI feedback</button>
           </div>
         </div>
+        ${feedbackPickerHTML()}
         <div id="fb" class="explain ${piece.feedback ? "" : "hidden"}"></div>
         <div id="chat-host"></div>
       </div>`;
@@ -1841,7 +1884,8 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
         ? `a ${(ESSAY_TYPES[st.essayType] || ESSAY_TYPES.persuasive).label.toLowerCase()} essay${st.side === "for" ? " arguing FOR" : st.side === "against" ? " arguing AGAINST" : ""} with ${st.paragraphs || 3} body paragraphs`
         : "a creative story";
       const history = piece.chat.slice(-10).map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.text}`).join("\n");
-      return `You are a friendly, encouraging Year 7 English tutor chatting with a student about their own writing. Help them understand and improve it: answer their questions, explain feedback, point to specific sentences, and suggest concrete improvements with short examples (a sentence or two at most). Do NOT rewrite whole paragraphs or the whole piece for them — guide them to make the changes themselves. Keep replies under 150 words, warm and clear, with no markdown formatting.
+      return `You are a Year 7 English tutor chatting with a student about their own writing. Help them understand and improve it: answer their questions, explain feedback, point to specific sentences, and suggest concrete improvements with short examples (a sentence or two at most). Do NOT rewrite whole paragraphs or the whole piece for them — guide them to make the changes themselves. Keep replies under 150 words, clear, with no markdown formatting.
+${feedbackTone()}
 
 The student is writing ${setup}. The prompt was: "${piece.prompt}"
 
@@ -2018,6 +2062,7 @@ function pickBuilder(view, host) {
           <select id="t-time">${timeOptions(20)}</select>
         </div>
       </div>
+      ${feedbackPickerHTML("How the AI marks written answers and talks about your mistakes.")}
       <div id="t-error" class="error hidden"></div>
       <div class="t-go">
         <button class="btn" id="t-start" type="button">Start test →</button>
@@ -2249,7 +2294,8 @@ async function markWrittenAnswers(list) {
   const todo = list.filter((w) => w.answer.trim());
   if (!todo.length) return out;
   try {
-    const reply = await askTutorRaw(`You are a fair, encouraging Year 7 teacher marking short written answers. For each one, decide if the student's answer is correct: it shows the key idea of the example answer, even if worded differently or with small spelling mistakes. Then give one or two short sentences of feedback written to the student.
+    const reply = await askTutorRaw(`You are a Year 7 teacher marking short written answers. For each one, decide if the student's answer is correct: it shows the key idea of the example answer, even if worded differently or with small spelling mistakes. Then give one or two short sentences of feedback written to the student.
+${feedbackTone("marking")}
 
 ${todo.map((w, n) => `Answer ${n + 1}
 Question: ${w.q.prompt}${w.q.passage ? `\nPassage: ${w.q.passage}` : ""}
@@ -2286,6 +2332,7 @@ function runTest(view, items, minutes, opts = {}) {
     </div>
     <form class="card" id="t-form" autocomplete="off">
       ${items.map(({ q, topic }, i) => questionHTML(q, i, topic.name, shown[i])).join("")}
+      ${items.some(({ q }) => q.answerType === "written") ? `<div style="margin-top:18px;">${feedbackPickerHTML("Used when the AI marks your written answers.")}</div>` : ""}
       <div class="row between" style="margin-top:18px;">
         <button class="btn ghost" type="button" id="t-quit">Quit</button>
         <button class="btn" type="submit">Submit test</button>
@@ -2386,6 +2433,9 @@ function tutorPrompt(earlier, question, hasPhoto) {
   return `You are chatting with a Year 7 student as their tutor.
 ${calendarPrompt()}${memoryPrompt()}
 ${recent.length ? `The conversation so far${earlier.length > recent.length ? " (the most recent messages)" : ""}:\n${lines.join("\n\n")}\n\n` : ""}Student's new message: ${question || "(no words, just the photo)"}${hasPhoto ? `\n(The student attached a photo, which is included.${question ? "" : " Look at their handwritten working and explain whether it's correct, and how to fix it if not."})` : ""}
+
+When you check the student's work or answers (including photos of their working), follow this:
+${feedbackTone()}
 
 Answer the student's new message, carrying on naturally from the conversation — they may refer back to earlier messages (like "the second one" or "explain that again"). In the reply write plain text with no Markdown or LaTeX, use × and ÷, and keep it fairly short unless they ask for more detail.
 
@@ -2704,6 +2754,12 @@ function pageSettings(view) {
     <div class="card stack">
       <p style="margin:0;">${subText}</p>
       <p class="muted small" style="margin:0;">To renew, pay <strong>$10 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so it may take a while.</p>
+    </div>
+
+    <div class="section-label">AI feedback</div>
+    <div class="card stack">
+      <p class="muted small" style="margin:0;">Choose how the AI talks when it marks your tests, checks your writing or looks at your working. <b>Chill</b> is relaxed and supportive, <b>Balanced</b> is fair and encouraging, <b>Critical</b> is strict and points out your mistakes, and <b>Super critical</b> is as tough as a strict exam marker and picks up every tiny error.</p>
+      ${feedbackPickerHTML()}
     </div>
 
     <div class="section-label">Appearance</div>

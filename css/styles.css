@@ -1240,3 +1240,13 @@ body::before {
 .give-row:not(.on) .give-badges { display: none; }
 .give-row.on .give-closed { display: none; }
 .give-closed { padding-top: 6px; }
+
+/* AI feedback style picker */
+.fb-style { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.fb-style-label { font-weight: 700; font-size: 14px; }
+.fb-style .segmented button { white-space: nowrap; }
+.fb-style .muted { flex-basis: 100%; }
+@media (max-width: 560px) {
+  .fb-style .segmented { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .fb-style .segmented button { white-space: normal; }
+}
