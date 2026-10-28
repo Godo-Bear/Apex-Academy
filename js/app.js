@@ -967,6 +967,7 @@ function pageTopic(view, t) {
 
     <div id="tab-learn" class="stack">
       ${lessonHTML(t.id)}
+      ${videosHTML(t)}
       ${explorerHTML(t.id)}
       ${t.example || t.diagram ? `
         <div class="card lesson">
@@ -1098,6 +1099,21 @@ function lessonHTML(topicId, { flat = false } = {}) {
       ${sec.visual ? visualHTML({ visual: sec.visual }) : ""}
       ${sec.tip ? `<div class="tip">💡 ${esc(sec.tip)}</div>` : ""}
     </div>`).join("");
+}
+
+// Video links for a topic (js/challenge.js). Each opens a YouTube search for short explainer videos on one idea.
+function videosHTML(t) {
+  const list = (typeof TOPIC_VIDEOS !== "undefined" && TOPIC_VIDEOS[t.id]) || [];
+  if (!list.length) return "";
+  const yt = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " explained for students")}`;
+  return `<div class="card lesson videos">
+      <h3>🎬 Videos to help</h3>
+      <p class="muted small">Each link finds short videos that explain one part of this topic.</p>
+      <div class="video-links">
+        ${list.map((q) => `<a class="video-link" href="${yt(q)}" target="_blank" rel="noopener"><span class="video-play">▶</span><span>${esc(q.charAt(0).toUpperCase() + q.slice(1))}</span><span class="muted small">YouTube</span></a>`).join("")}
+        <a class="video-link" href="https://www.khanacademy.org/search?page_search_query=${encodeURIComponent(t.name)}" target="_blank" rel="noopener"><span class="video-play">▶</span><span>${esc(t.name)} lessons</span><span class="muted small">Khan Academy</span></a>
+      </div>
+    </div>`;
 }
 
 // Keeps questions about the same reading passage next to each other (in the order they first appear).
@@ -1476,7 +1492,7 @@ function pageWriting(view, t) {
     ${lessonHTML(t.id) ? `
       <details class="card" style="margin-bottom:16px;">
         <summary>📖 How to write ${isEssay ? "a strong essay" : "a great story"}</summary>
-        <div class="stack" style="margin-top:12px;">${lessonHTML(t.id, { flat: true })}</div>
+        <div class="stack" style="margin-top:12px;">${lessonHTML(t.id, { flat: true })}${videosHTML(t)}</div>
       </details>` : ""}
     <div class="segmented" id="w-tabs" style="margin-bottom:16px;">
       <button type="button" data-tab="new">✏️ New piece</button>
@@ -2219,7 +2235,7 @@ Interactive and picture questions — use them where they suit the topic (especi
 For those, "answer" can be "".
 Diagrams shown above a typed or multiple-choice question: {"type":"plane","points":[{"x":3,"y":-2,"label":"A"}]}, {"type":"numberline","min":-5,"max":5,"step":1,"marks":[{"v":-3,"label":"A"}]}, {"type":"fraction","parts":5,"shaded":2}, {"type":"bars","labels":["Mon","Tue"],"values":[4,7],"title":"Rainy days"}, {"type":"spinner","sections":["red","blue","red"]}, {"type":"triangle","angles":["50°","60°","?"]}, {"type":"rect","w":8,"h":5,"unit":"cm"}, {"type":"circle","r":7,"unit":"cm"}, {"type":"angle","deg":120}, {"type":"table","rows":[["x",1,2,3],["y",3,5,"?"]]}.
 
-Each question: {"prompt":"...","options":[...],"type":"written or point","passage":"...","visual":{...},"answer":"...","explanation":"one short sentence","difficulty":1,"topicName":"Subject: topic"} — leave out keys that don't apply. difficulty: 1 easy, 2 medium, 3 hard. Make sure every fact and answer is correct.`;
+Each question: {"prompt":"...","options":[...],"type":"written or point","passage":"...","visual":{...},"answer":"...","explanation":"a worked explanation showing each step or the reason (1–3 sentences)","difficulty":1,"topicName":"Subject: topic"} — leave out keys that don't apply. difficulty: 1 easy, 2 medium, 3 hard. Make sure every fact and answer is correct.`;
 
 // Asks the tutor for new questions modelled on the student's examples.
 // With topics: stays within those topics/difficulties. Without: matches the examples' own subject and level.

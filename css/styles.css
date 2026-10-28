@@ -1259,3 +1259,10 @@ body::before {
 .tutor-fb .lvl-pick select { padding: 6px 10px; font-size: 13px; }
 .tutor-fb .fb-style-label { font-size: 13px; }
 .tutor-fb .segmented button { padding: 6px 10px; font-size: 13px; }
+
+/* Topic video links */
+.video-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 8px; }
+.video-link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14px; }
+.video-link:hover { border-color: var(--accent); }
+.video-link > span:nth-child(2) { flex: 1; }
+.video-play { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; }
