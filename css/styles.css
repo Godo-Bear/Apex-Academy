@@ -1251,6 +1251,11 @@ body::before {
   .fb-style .segmented { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .fb-style .segmented button { white-space: normal; }
 }
-.tutor-fb { padding: 8px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+/* Learning level picker */
+.lvl-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.lvl-pick select { width: auto; max-width: 100%; min-width: 0; }
+.lvl-pick .muted { flex-basis: 100%; }
+.tutor-fb { padding: 8px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; }
+.tutor-fb .lvl-pick select { padding: 6px 10px; font-size: 13px; }
 .tutor-fb .fb-style-label { font-size: 13px; }
 .tutor-fb .segmented button { padding: 6px 10px; font-size: 13px; }

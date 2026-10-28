@@ -129,6 +129,7 @@ function aiTestMode(view, host) {
   host.innerHTML = `
     <div class="card stack">
       <p class="muted small" style="margin:0;">Tell the AI what to test you on — any subject (maths, English, science, history…), what types of questions, and how hard. It writes them straight into your test below, and you can keep chatting to add more or change them.</p>
+      ${levelPickerHTML("The AI writes the questions at this year level. On Any level, it goes by what you ask for (e.g. “Year 10 algebra”).")}
       <div id="tc-files">${uploadBoxHTML("The AI will use them — e.g. “Make 10 questions like the ones in my file”.")}</div>
       <div id="tc-chat"></div>
       <details class="types-box"${aiTest.types.length ? " open" : ""}><summary>Question types <span class="muted">(optional — or just tell the AI)</span></summary>
@@ -155,7 +156,8 @@ function aiTestMode(view, host) {
       const history = chatHistory(aiTest.log.slice(0, -2));
       if (aiTest.files.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
       await Promise.all([loadMemory(), ensureCalendar()]);
-      const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) building a practice test WITH a student in a chat. The test can be on ANY school subject or topic: maths, English, science, history, geography, health, languages, digital technologies, general knowledge, or anything school-appropriate they're interested in.
+      const raw = await askTutorRaw(await withUploads(`You are a friendly tutor (based in Victoria, Australia) building a practice test WITH a student in a chat. The test can be on ANY subject or learning topic, at any level: school subjects from Prep to VCE, uni or TAFE topics, languages, coding, music, general knowledge, or anything school-appropriate they're interested in.
+${learnerLine()}
 ${calendarPrompt()}${memoryPrompt()}
 ${summary()}
 ${types.length ? `The student ticked these question types: ${types.join(", ")}. Use them.\n` : ""}
@@ -165,7 +167,7 @@ What to do:
 - If they say "start again" or "clear the test", set "clear" to true.
 - If they're not sure, suggest a couple of ideas and ask ONE short question — don't add anything yet.
 - If they just chat or ask something, answer briefly.
-- Never give away the answers in your reply. Pitch questions at Year 7 unless they ask for easier or harder.
+- Never give away the answers in your reply. Pitch questions at the student's level (see LEVEL above) unless they ask for easier or harder.
 
 ${AI_QUESTION_RULES}
 
@@ -553,7 +555,8 @@ function flashcardsMode(view, host) {
       const listCards = deck.cards.slice(0, 60).map((c, i) => `${i + 1}. ${c.f.slice(0, 90)} → ${c.b.slice(0, 90)}`).join("\n");
       if (studyFiles.cards.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
       await Promise.all([loadMemory(), ensureCalendar()]);
-      const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) helping a student make and study flashcards, in a chat. Flashcards can be on ANY school subject or topic.
+      const raw = await askTutorRaw(await withUploads(`You are a friendly tutor (based in Victoria, Australia) helping a student make and study flashcards, in a chat. Flashcards can be on ANY subject or learning topic, at any level.
+${learnerLine()}
 ${calendarPrompt()}${memoryPrompt()}
 ${deck.cards.length ? `The current deck "${deck.name}" has ${deck.cards.length} cards:\n${listCards}` : `The current deck${deck.name !== "New deck" ? ` ("${deck.name}")` : ""} is empty.`}
 
@@ -763,7 +766,8 @@ function infoMode(view, host) {
       const current = page ? `The student's current page is "${page.title}", with these sections: ${page.sections.map((s) => s.heading).join("; ")}.` : "There's no page yet.";
       if (studyFiles.info.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
       await Promise.all([loadMemory(), ensureCalendar()]);
-      const raw = await askTutorRaw(await withUploads(`You are a friendly Year 7 tutor (Victorian Curriculum, Australia) making an interactive info page WITH a student, in a chat. It can be about ANY school-appropriate subject or topic: facts about something, how something works, a summary of a school topic, or ideas (for a project, story, essay, experiment or presentation).
+      const raw = await askTutorRaw(await withUploads(`You are a friendly tutor (based in Victoria, Australia) making an interactive info page WITH a student, in a chat. It can be about ANY school-appropriate subject or learning topic, at any level: facts about something, how something works, a summary of a topic from any year level, VCE, uni or TAFE, or ideas (for a project, story, essay, experiment or presentation).
+${learnerLine()}
 ${calendarPrompt()}${memoryPrompt()}
 ${current}
 
@@ -771,7 +775,7 @@ What to do:
 - If they ask about a new topic, make a NEW page ("mode": "new").
 - If they want more on the current page (more detail, another section, examples, a simpler explanation of part of it, more ideas), ADD only the new parts ("mode": "add").
 - If they just ask a question or chat, answer briefly ("mode": "none").
-- Write clearly for a Year 7 student and make sure every fact is correct. A new page has 3–5 sections of 2–5 short points (under 25 words each), 3–6 key terms, 2–4 "did you know" facts and 3 multiple-choice quick-check questions.
+- Write clearly for the student's level (see LEVEL above) and make sure every fact is correct. A new page has 3–5 sections of 2–5 short points (under 25 words each), 3–6 key terms, 2–4 "did you know" facts and 3 multiple-choice quick-check questions.
 - For maths or science you can add a diagram to a section with "visual", e.g. {"type":"bars","labels":["A","B"],"values":[3,5],"title":"..."}, {"type":"plane","points":[{"x":2,"y":3,"label":"A"}]}, {"type":"numberline","min":0,"max":10,"step":1}, {"type":"fraction","parts":4,"shaded":3}, {"type":"triangle","angles":["60°","60°","60°"]}, {"type":"circle","r":5,"unit":"cm"}, {"type":"table","rows":[["Planet","Moons"],["Earth",1],["Mars",2]]}.
 
 ${history ? `Chat so far:\n${history}\n\n` : ""}Student: ${text}

@@ -831,7 +831,7 @@ function pageHome(view) {
       ${$("#logo-tpl").innerHTML.replace("logo-mark", "logo-crest")}
       <div>
         <h2><b>JIN</b>telligence</h2>
-        <p>Year 7 Maths, English &amp; Science · Victorian Curriculum</p>
+        <p>Year 7 Maths, English &amp; Science · AI help for any subject, any level</p>
       </div>
     </div>
     <div class="page-head">
@@ -1175,12 +1175,13 @@ function markQuestion(row, q, correct, { yourAnswer, feedback } = {}) {
     box.textContent = "Working through the steps…";
     btn.disabled = true;
     try {
-      box.textContent = await askTutor(`You are a friendly Year 7 tutor. Give a clear, numbered, step-by-step walkthrough for solving this question:
+      box.textContent = await askTutor(`You are a friendly tutor. Give a clear, numbered, step-by-step walkthrough for solving this question:
 "${q.prompt}"
 ${q.passage ? `It is about this passage: "${q.passage}"\n` : ""}${q.visual ? `(The question shows: ${describeVisual(q.visual)}.)\n` : ""}
 The correct answer is: "${displayAnswer(q)}"
 
-Break the solution into short numbered steps a Year 7 student could follow easily. Keep it concise, no markdown formatting.`);
+Break the solution into short numbered steps the student could follow easily. Keep it concise, no markdown formatting.
+${learnerLine("Year 7")}`);
       box.dataset.loaded = "1";
     } catch (err) {
       console.error(err);
@@ -1290,12 +1291,62 @@ document.addEventListener("click", (e) => {
   toast(`AI feedback: ${FEEDBACK_STYLES[btn.dataset.fbStyle].long}`);
 });
 
+// ---------------- Learning level ----------------
+// The AI can help with any subject at any level. "Any level" lets it work out the level from what you ask;
+// or pick your year level so every explanation, question and piece of feedback is pitched at it.
+const LEARN_LEVELS = {
+  auto: { label: "✨ Any level (AI works it out)", short: "Any level" },
+  p2: { label: "Prep – Year 2", who: "in Prep to Year 2 (about 5–8 years old)", how: "use very simple words, short sentences, everyday examples and lots of encouragement" },
+  y34: { label: "Years 3–4", who: "in Year 3 or 4 (about 8–10 years old)", how: "use simple, clear language and fun, relatable examples" },
+  y56: { label: "Years 5–6", who: "in Year 5 or 6 (about 10–12 years old)", how: "use clear language and relatable examples, and introduce proper terms gently" },
+  y7: { label: "Year 7", who: "in Year 7 (about 12–13 years old)", how: "follow the Victorian Curriculum for Year 7" },
+  y8: { label: "Year 8", who: "in Year 8 (about 13–14 years old)", how: "follow the Victorian Curriculum for Year 8" },
+  y9: { label: "Year 9", who: "in Year 9 (about 14–15 years old)", how: "follow the Victorian Curriculum for Year 9" },
+  y10: { label: "Year 10", who: "in Year 10 (about 15–16 years old)", how: "follow the Victorian Curriculum for Year 10, and prepare them for VCE where it fits" },
+  y11: { label: "Year 11 (VCE)", who: "in Year 11, studying VCE (about 16–17 years old)", how: "follow the VCE study designs (Units 1–2): exam-style detail, correct subject terms and well-structured answers" },
+  y12: { label: "Year 12 (VCE)", who: "in Year 12, studying VCE (about 17–18 years old)", how: "follow the VCE study designs (Units 3–4): exam-style detail, correct subject terms, and what examiners look for" },
+  uni: { label: "University / TAFE", who: "at university or TAFE", how: "assume solid background knowledge, use proper terminology and go into real depth" },
+  adult: { label: "Adult learner", who: "an adult learner, who may be new to the topic", how: "be clear and respectful, never talk down, and give real-world examples" },
+};
+const learnLevelKey = () => `apex-learn-level-${authUser.id}`;
+const learnLevel = () => (LEARN_LEVELS[store(learnLevelKey())] ? store(learnLevelKey()) : "auto");
+// The site's question bank is Year 7, so it's used on Year 7 or "Any level"; other levels get AI-written tests.
+const bankLevel = () => ["auto", "y7"].includes(learnLevel());
+// Added to AI prompts so answers suit the student. `fallback` is the level to use on "Any level" when the work
+// itself is pitched at a set level (e.g. the Year 7 questions and writing prompts on this site).
+function learnerLine(fallback = "") {
+  const lvl = LEARN_LEVELS[learnLevel()];
+  if (!lvl.who) return fallback
+    ? `LEVEL: Pitch everything at about a ${fallback} level, unless the student has said (or it's clear) they're at a different level — then match theirs.`
+    : `LEVEL: The student could be at any level: primary school, high school, VCE, university, TAFE or an adult learner. Work out their level from what they ask, how they write and anything they've told you (or that you remember) about their year level or course, and pitch your answer to match. If you can't tell, aim at about a Year 8 level and offer to make it simpler or go deeper. If they ask for a different level ("explain it like I'm in Year 3", "give me VCE-level detail"), do that.`;
+  return `LEVEL: The student is ${lvl.who}, in Victoria, Australia. Pitch every explanation, example, question and piece of feedback at that level: ${lvl.how}. If they ask for something simpler or harder, do that.`;
+}
+// Any learning topic, at any level — used in the open-ended AI chats.
+const ANY_SUBJECT = "They can ask about ANY subject or learning topic, at any level: maths (from counting to calculus), English and literature, every science, history, geography, economics, business, legal studies, psychology, health and PE, languages, the arts, music, drama, digital technologies and coding, VCE subjects, uni and TAFE topics, study skills, general knowledge and how things work.";
+function levelPickerHTML(note = "") {
+  const cur = learnLevel();
+  return `<label class="lvl-pick">
+    <span class="fb-style-label">🎓 Your level</span>
+    <select data-learn-level aria-label="Your learning level">
+      ${Object.entries(LEARN_LEVELS).map(([k, v]) => `<option value="${k}"${k === cur ? " selected" : ""}>${v.label}</option>`).join("")}
+    </select>
+    ${note ? `<span class="muted small">${note}</span>` : ""}
+  </label>`;
+}
+document.addEventListener("change", (e) => {
+  const sel = e.target.closest("[data-learn-level]");
+  if (!sel || !authUser || !LEARN_LEVELS[sel.value]) return;
+  store(learnLevelKey(), sel.value);
+  $$("[data-learn-level]").forEach((s) => { s.value = sel.value; });
+  toast(`Your level: ${LEARN_LEVELS[sel.value].short || LEARN_LEVELS[sel.value].label}`);
+});
+
 function writingFeedbackPrompt(t, piece) {
   const s = piece.settings || {};
   const text = writingText(piece);
   const target = s.target ? ` They were aiming for about ${s.target} words and wrote ${countWords(text)}.` : "";
   if (t.special === "creative-writing") {
-    return `You are a Year 7 English teacher marking a piece of creative writing. The writing prompt was: "${piece.prompt}".${target}
+    return `You are an English teacher marking a piece of creative writing. The writing prompt was: "${piece.prompt}".${target}
 
 Here is the student's writing:
 """
@@ -1310,12 +1361,13 @@ Give feedback a teacher would give on a creative writing piece, covering:
 5. Things they did well.
 6. One clear, specific suggestion for how to improve the piece overall.
 
-Keep it specific and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.
+Keep it specific and easy for the student to understand. Use short paragraphs or a simple list, not markdown formatting.
+${learnerLine("Year 7")}
 
 ${feedbackTone()}`;
   }
   const type = ESSAY_TYPES[s.essayType] || ESSAY_TYPES.persuasive;
-  return `You are a Year 7 English teacher marking a piece of essay writing. The essay prompt was: "${piece.prompt}"
+  return `You are an English teacher marking a piece of essay writing. The essay prompt was: "${piece.prompt}"
 
 The student chose to write a ${type.label.toLowerCase()} essay (${type.hint})${s.side === "for" ? ", arguing FOR the topic" : s.side === "against" ? ", arguing AGAINST the topic" : ""}, with an introduction, ${s.paragraphs || 3} body paragraph${s.paragraphs === 1 ? "" : "s"} and a conclusion.${target}
 
@@ -1334,7 +1386,8 @@ Give feedback a teacher would give on an essay, covering:
 7. Things they did well.
 8. One clear, specific suggestion for how to improve the essay overall.
 
-Keep it specific and easy for a Year 7 student to understand. Use short paragraphs or a simple list, not markdown formatting.
+Keep it specific and easy for the student to understand. Use short paragraphs or a simple list, not markdown formatting.
+${learnerLine("Year 7")}
 
 ${feedbackTone()}`;
 }
@@ -1557,18 +1610,19 @@ function pageWriting(view, t) {
 
   // Asks the tutor for 4 pieces of evidence on each side of the prompt.
   async function fetchEvidence(prompt) {
-    const raw = await askTutor(`A Year 7 student is writing an essay on this topic:
+    const raw = await askTutor(`A student is writing an essay on this topic:
 "${prompt}"
 
 Give exactly 4 strong pieces of evidence FOR the statement/position and exactly 4 strong pieces of evidence AGAINST it. If the topic isn't really a for/against question, interpret "for" as supporting the main idea and "against" as challenging it.
 
 For each piece give:
-- "point": one or two sentences a Year 7 student can understand and use in a paragraph — a clear reason backed by a concrete example, fact or real-world situation. Only use well-known, accurate facts; don't invent statistics or studies.
+- "point": one or two sentences the student can understand and use in a paragraph — a clear reason backed by a concrete example, fact or real-world situation. Only use well-known, accurate facts; don't invent statistics or studies.
 - "source": the real organisation, official body or well-known publication most associated with this information (prefer Australian ones where they fit, e.g. Australian Bureau of Statistics, eSafety Commissioner, Australian Institute of Health and Welfare, Raising Children Network; otherwise e.g. World Health Organization, UNICEF). Name the organisation only.
 - "expert": one sentence paraphrasing what professionals in this field generally say, e.g. "Paediatric sleep researchers recommend…". Describe the type of expert — never name a specific person and never use quotation marks.
 - "search": a short web search phrase (5–8 words) a student could use to find this information from that source.
 
 Never invent URLs, page titles, people's names or direct quotes.
+${learnerLine("Year 7")}
 
 Respond with ONLY valid JSON, no other text, in exactly this format:
 {"for": [{"point": "...", "source": "...", "expert": "...", "search": "..."}, ...4 items], "against": [...4 items in the same format]}`);
@@ -1884,7 +1938,8 @@ Respond with ONLY valid JSON, no other text, in exactly this format:
         ? `a ${(ESSAY_TYPES[st.essayType] || ESSAY_TYPES.persuasive).label.toLowerCase()} essay${st.side === "for" ? " arguing FOR" : st.side === "against" ? " arguing AGAINST" : ""} with ${st.paragraphs || 3} body paragraphs`
         : "a creative story";
       const history = piece.chat.slice(-10).map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.text}`).join("\n");
-      return `You are a Year 7 English tutor chatting with a student about their own writing. Help them understand and improve it: answer their questions, explain feedback, point to specific sentences, and suggest concrete improvements with short examples (a sentence or two at most). Do NOT rewrite whole paragraphs or the whole piece for them — guide them to make the changes themselves. Keep replies under 150 words, clear, with no markdown formatting.
+      return `You are an English tutor chatting with a student about their own writing. Help them understand and improve it: answer their questions, explain feedback, point to specific sentences, and suggest concrete improvements with short examples (a sentence or two at most). Do NOT rewrite whole paragraphs or the whole piece for them — guide them to make the changes themselves. Keep replies under 150 words, clear, with no markdown formatting.
+${learnerLine("Year 7")}
 ${feedbackTone()}
 
 The student is writing ${setup}. The prompt was: "${piece.prompt}"
@@ -2062,6 +2117,7 @@ function pickBuilder(view, host) {
           <select id="t-time">${timeOptions(20)}</select>
         </div>
       </div>
+      ${levelPickerHTML("Year 7 or Any level uses the question bank. Pick another level and the AI writes new questions on your topics at that level.")}
       ${feedbackPickerHTML("How the AI marks written answers and talks about your mistakes.")}
       <div id="t-error" class="error hidden"></div>
       <div class="t-go">
@@ -2108,7 +2164,9 @@ function pickBuilder(view, host) {
       if (!diffs.length) return setMsg(err, "Pick at least one difficulty.", "error");
     }
 
-    if (examples || files.length) {
+    // The question bank is Year 7, so for any other level the AI writes the test at that level.
+    const atLevel = !bankLevel();
+    if (examples || files.length || atLevel) {
       const btn = startBtn;
       btn.disabled = true;
       btn.textContent = "Writing your test…";
@@ -2122,7 +2180,7 @@ function pickBuilder(view, host) {
         console.error("Apex: AI test generation failed —", e);
         btn.disabled = false;
         btn.textContent = label;
-        setMsg(err, e.userMessage || (files.length ? "Couldn't write a test from those files. Try fewer or smaller files, or add an example question." : "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank."), "error");
+        setMsg(err, e.userMessage || (files.length ? "Couldn't write a test from those files. Try fewer or smaller files, or add an example question." : examples ? "Couldn't write a test from those examples. Try rewording them, or clear the box to use the question bank." : "Couldn't write a test at that level — try again, or set your level to Year 7 to use the question bank."), "error");
       }
       return;
     }
@@ -2176,19 +2234,25 @@ Respond with ONLY a valid JSON array of question objects — no other text, no m
 ${examples}
 """
 ` : "";
+  const lvl = LEARN_LEVELS[learnLevel()];
   const prompt = topics
-    ? `You are writing exam questions for a Year 7 Australian curriculum test covering these topics: ${topics.map((t) => t.name).join(", ")}.
-Difficulty level(s) to write at: ${diffs.map((d) => DIFF_NAMES[d].toLowerCase()).join("/")}.
+    ? `You are writing exam questions for a ${bankLevel() ? "Year 7 Australian curriculum" : `${lvl.label} (Victoria, Australia)`} test covering these topics: ${topics.map((t) => t.name).join(", ")}.
+${bankLevel() ? "" : `These topic names come from a Year 7 course, but this test is for a student ${lvl.who}: write questions on the same topic areas pitched at THEIR level (easier or harder than Year 7 as needed), following the right curriculum for that level.
+`}Difficulty level(s) to write at${bankLevel() ? "" : " (relative to that year level)"}: ${diffs.map((d) => DIFF_NAMES[d].toLowerCase()).join("/")}.
 
 ${examplesBlock}${hasFiles ? "Also use the student's uploaded files (above): base questions on their content where it fits these topics, and copy the style of any questions in them.\n" : ""}
-Write exactly ${count} new original questions in that same style, spread across the topics listed above and matching the requested difficulty level(s). Set topicName to whichever listed topic each question belongs to.
+Write exactly ${count} new original questions${examples || hasFiles ? " in that same style" : " with a good mix of question types"}, spread across the topics listed above and matching the requested difficulty level(s). Set topicName to whichever listed topic each question belongs to.
 
 ${rules}`
     : `You are writing exam questions based on ${hasFiles ? `the student's uploaded files (above)${examples ? " and these example questions" : ""}` : "example questions a student has given you"}.
 ${examplesBlock}
-First, work out what subject/topic this material covers and what level it is pitched at — judge this from the material itself, not from any assumed year level, and match that same level.
+${learnLevel() === "auto"
+    ? `First, work out what subject/topic this material covers and what level it is pitched at — judge this from the material itself, not from any assumed year level, and match that same level.
 
-Then write exactly ${count} new original questions on that same subject, at that same level. If the material contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style and format — don't copy them. If it's notes or a textbook page, test the key facts and ideas in it. Set topicName to the subject you identified, and difficulty to 1 (easier than the material), 2 (about the same) or 3 (harder).
+Then write exactly ${count} new original questions on that same subject, at that same level.`
+    : `First, work out what subject/topic this material covers. The student has chosen their year level: they are ${lvl.who}. Pitch the questions at that level.
+
+Then write exactly ${count} new original questions on that same subject, at that level.`} If the material contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style and format — don't copy them. If it's notes or a textbook page, test the key facts and ideas in it. Set topicName to the subject you identified, and difficulty to 1 (easier than the material), 2 (about the same) or 3 (harder).
 
 ${rules}`;
 
@@ -2294,7 +2358,8 @@ async function markWrittenAnswers(list) {
   const todo = list.filter((w) => w.answer.trim());
   if (!todo.length) return out;
   try {
-    const reply = await askTutorRaw(`You are a Year 7 teacher marking short written answers. For each one, decide if the student's answer is correct: it shows the key idea of the example answer, even if worded differently or with small spelling mistakes. Then give one or two short sentences of feedback written to the student.
+    const reply = await askTutorRaw(`You are a teacher marking short written answers. For each one, decide if the student's answer is correct: it shows the key idea of the example answer, even if worded differently or with small spelling mistakes. Then give one or two short sentences of feedback written to the student.
+${learnerLine("Year 7")}
 ${feedbackTone("marking")}
 
 ${todo.map((w, n) => `Answer ${n + 1}
@@ -2430,7 +2495,8 @@ const TUTOR_HISTORY = 12; // earlier messages sent with each question
 function tutorPrompt(earlier, question, hasPhoto) {
   const recent = earlier.slice(-TUTOR_HISTORY);
   const lines = recent.map((m) => `${m.role === "me" ? "Student" : "Tutor"}: ${m.photo ? "[sent a photo] " : ""}${String(m.text).slice(0, 1500)}`);
-  return `You are chatting with a Year 7 student as their tutor.
+  return `You are chatting with a student as their tutor. ${ANY_SUBJECT}
+${learnerLine()}
 ${calendarPrompt()}${memoryPrompt()}
 ${recent.length ? `The conversation so far${earlier.length > recent.length ? " (the most recent messages)" : ""}:\n${lines.join("\n\n")}\n\n` : ""}Student's new message: ${question || "(no words, just the photo)"}${hasPhoto ? `\n(The student attached a photo, which is included.${question ? "" : " Look at their handwritten working and explain whether it's correct, and how to fix it if not."})` : ""}
 
@@ -2449,7 +2515,7 @@ function pageTutor(view) {
   let pendingImage = null, chats = [], current = null, busy = false;
   const blankChat = () => ({ id: newChatId(), title: "New chat", messages: [], createdAt: new Date().toISOString() });
   view.innerHTML = `
-    <div class="page-head"><h1>AI Tutor</h1><p>Ask about any school subject — maths, English, science and more — and get a friendly explanation. You can send a photo of your working too. Your chats are saved, and the tutor remembers what you've talked about.</p></div>
+    <div class="page-head"><h1>AI Tutor</h1><p>Ask about anything you're learning — any subject, at any level from Prep to VCE, uni and beyond. Set your level so answers are pitched just right. You can send a photo of your working too, and your chats are saved.</p></div>
     <div class="tutor-wrap">
       <aside class="card tutor-side" id="t-side" aria-label="Your chats">
         <button class="btn" type="button" data-new-chat>＋ New chat</button>
@@ -2462,7 +2528,7 @@ function pageTutor(view) {
           <strong class="tutor-title" id="t-title"></strong>
           <button class="btn ghost sm tutor-new" type="button" data-new-chat title="Start a new chat">＋ New</button>
         </div>
-        <div class="tutor-fb">${feedbackPickerHTML("How the tutor talks when it checks your work or a photo of your working.")}</div>
+        <div class="tutor-fb">${levelPickerHTML()}${feedbackPickerHTML("How the tutor talks when it checks your work or a photo of your working.")}</div>
         <div class="chat" id="chat"><p class="muted small" style="margin:auto;">Loading your chats…</p></div>
         <div class="attach-preview hidden" id="attach"><img alt=""><button class="btn ghost sm" id="attach-x">Remove photo</button></div>
         <form class="chat-form" id="chat-form" autocomplete="off">
@@ -2479,7 +2545,7 @@ function pageTutor(view) {
     if (!current) return;
     $("#t-title", view).textContent = current.title;
     if (!current.messages.length) {
-      const examples = ["How do I simplify 12/18?", "What's the difference between their, there and they're?", "How do I find the area of a triangle?"];
+      const examples = ["How do I simplify 12/18?", "Explain photosynthesis simply", "Help me with VCE derivatives", "How do loops work in Python?"];
       const welcome = aiMemory?.enabled && aiMemory.items.length ? "Welcome back! What would you like help with today?" : "What would you like help with?";
       chatBox.innerHTML = `<div class="chat-empty">${welcome}
         <div class="chips">${examples.map((x) => `<button type="button" class="btn secondary sm">${esc(x)}</button>`).join("")}</div></div>`;
@@ -2755,6 +2821,12 @@ function pageSettings(view) {
     <div class="card stack">
       <p style="margin:0;">${subText}</p>
       <p class="muted small" style="margin:0;">To renew, pay <strong>$10 cash in hand</strong> to the site owner for another 6 months. Accounts are unlocked by hand, so it may take a while.</p>
+    </div>
+
+    <div class="section-label">Your level</div>
+    <div class="card stack">
+      <p class="muted small" style="margin:0;">The AI can help with any subject at any level — from Prep to VCE, uni, TAFE and beyond. Pick your level so explanations, practice questions and feedback are pitched just right, or leave it on <b>Any level</b> and the AI works it out from what you ask.</p>
+      ${levelPickerHTML()}
     </div>
 
     <div class="section-label">AI feedback</div>

@@ -439,7 +439,7 @@ function playGame(view, s, extra = {}) {
     const box = $("#g-hint", form);
     show(box); box.textContent = "🤖 Thinking of a hint…";
     try {
-      const hint = await askTutor(`Give a Year 7 student ONE short hint (one or two sentences) for this question. Do NOT give the answer or say which option is right.\nQuestion: ${q.prompt}${q.options ? "\nOptions: " + q.options.join(" | ") : ""}${q.passage ? "\nPassage: " + q.passage : ""}`);
+      const hint = await askTutor(`Give the student ONE short hint (one or two sentences) for this question. Do NOT give the answer or say which option is right. ${learnerLine("Year 7")}\nQuestion: ${q.prompt}${q.options ? "\nOptions: " + q.options.join(" | ") : ""}${q.passage ? "\nPassage: " + q.passage : ""}`);
       if (box.isConnected) box.textContent = "🤖 Hint: " + hint;
     } catch (e) {
       if (box.isConnected) box.textContent = "🤖 " + (e.userMessage || "The AI couldn't give a hint right now.");
