@@ -1132,8 +1132,10 @@ function questionHTML(q, i, topicLabel = "", showPassage = q.showPassage) {
   return `
     <div class="question" data-qid="${q.id}">
       ${topicLabel ? `<div class="tag" style="display:inline-block; margin-bottom:6px;">${esc(topicLabel)}</div>` : ""}
-      ${showPassage ? `<div class="passage">${esc(q.passage)}</div>` : q.passage ? `<div class="muted small passage-ref">📖 Use the passage above.</div>` : ""}
+      ${q.style ? `<div class="tag q-style q-style-${esc(q.style.toLowerCase().replace(/[^a-z]/g, ""))}">${esc(q.style)}</div>` : ""}
+      ${showPassage ? `<div class="passage">${esc(q.passage)}</div>` : q.passage ? `<div class="muted small passage-ref">📖 Use the information above.</div>` : ""}
       <div class="prompt"><span class="num">${i + 1}.</span>${esc(q.prompt)}</div>
+      ${q.table ? visualHTML({ visual: { type: "table", rows: q.table } }) : ""}
       ${isVisualInput(q) ? `<input type="hidden" data-qid="${q.id}" value="">${visualHTML(q)}`
       : `${visualHTML(q)}${q.answerType === "written" ? `<textarea data-qid="${q.id}" rows="3" placeholder="Write your answer in your own words"></textarea>`
       : q.answerType === "point" ? pointInputHTML(q)
