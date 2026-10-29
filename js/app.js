@@ -1101,17 +1101,15 @@ function lessonHTML(topicId, { flat = false } = {}) {
     </div>`).join("");
 }
 
-// Video links for a topic (js/challenge.js). Each opens a YouTube search for short explainer videos on one idea.
+// Video links for a topic (js/challenge.js). Each opens one explainer video on YouTube.
 function videosHTML(t) {
   const list = (typeof TOPIC_VIDEOS !== "undefined" && TOPIC_VIDEOS[t.id]) || [];
   if (!list.length) return "";
-  const yt = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " explained for students")}`;
   return `<div class="card lesson videos">
       <h3>🎬 Videos to help</h3>
-      <p class="muted small">Each link finds short videos that explain one part of this topic.</p>
+      <p class="muted small">Short videos that explain this topic. They open on YouTube.</p>
       <div class="video-links">
-        ${list.map((q) => `<a class="video-link" href="${yt(q)}" target="_blank" rel="noopener"><span class="video-play">▶</span><span>${esc(q.charAt(0).toUpperCase() + q.slice(1))}</span><span class="muted small">YouTube</span></a>`).join("")}
-        <a class="video-link" href="https://www.khanacademy.org/search?page_search_query=${encodeURIComponent(t.name)}" target="_blank" rel="noopener"><span class="video-play">▶</span><span>${esc(t.name)} lessons</span><span class="muted small">Khan Academy</span></a>
+        ${list.map(([title, id]) => `<a class="video-link" href="https://www.youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener"><span class="video-play">▶</span><span>${esc(title)}</span></a>`).join("")}
       </div>
     </div>`;
 }
