@@ -129,7 +129,9 @@ function aiTestMode(view, host) {
   host.innerHTML = `
     <div class="card stack">
       <p class="muted small" style="margin:0;">Tell the AI what to test you on — any subject (maths, English, science, history…), what types of questions, and how hard. It writes them straight into your test below, and you can keep chatting to add more or change them.</p>
-      ${levelPickerHTML("The AI writes the questions at this year level. On Any level, it goes by what you ask for (e.g. “Year 10 algebra”).")}
+      ${testLevelsHTML("Tick one or more — the AI spreads the questions across them. Leave them all unticked to use your level.")}
+      ${testDiffHTML()}
+      ${feedbackPickerHTML("How the AI marks your written answers and talks about your mistakes.")}
       <div id="tc-files">${uploadBoxHTML("The AI will use them — e.g. “Make 10 questions like the ones in my file”.")}</div>
       <div id="tc-chat"></div>
       <details class="types-box"${aiTest.types.length ? " open" : ""}><summary>Question types <span class="muted">(optional — or just tell the AI)</span></summary>
@@ -157,7 +159,8 @@ function aiTestMode(view, host) {
       if (aiTest.files.some((f) => f.status === "reading")) throw Object.assign(new Error("files still loading"), { userMessage: "Your files are still loading — wait a moment, then send again." });
       await Promise.all([loadMemory(), ensureCalendar()]);
       const raw = await askTutorRaw(await withUploads(`You are a friendly tutor (based in Victoria, Australia) building a practice test WITH a student in a chat. The test can be on ANY subject or learning topic, at any level: school subjects from Prep to VCE, uni or TAFE topics, languages, coding, music, general knowledge, or anything school-appropriate they're interested in.
-${learnerLine()}
+${testLevelLine()}
+${testDiffLine()}
 ${calendarPrompt()}${memoryPrompt()}
 ${summary()}
 ${types.length ? `The student ticked these question types: ${types.join(", ")}. Use them.\n` : ""}
@@ -167,7 +170,7 @@ What to do:
 - If they say "start again" or "clear the test", set "clear" to true.
 - If they're not sure, suggest a couple of ideas and ask ONE short question — don't add anything yet.
 - If they just chat or ask something, answer briefly.
-- Never give away the answers in your reply. Pitch questions at the student's level (see LEVEL above) unless they ask for easier or harder.
+- Never give away the answers in your reply. Pitch questions at the year level(s) and difficulty above unless the student asks for something different in the chat.
 
 ${AI_QUESTION_RULES}
 

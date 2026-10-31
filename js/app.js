@@ -1357,6 +1357,57 @@ document.addEventListener("change", (e) => {
   toast(`Your level: ${LEARN_LEVELS[sel.value].short || LEARN_LEVELS[sel.value].label}`);
 });
 
+// ---------------------------------------------------------------- Test options
+// On the two test tabs you can tick several year levels to focus on, and how hard the questions should be.
+// No year levels ticked = use "Your level".
+const testLevelsKey = () => `apex-test-levels-${authUser.id}`;
+const testLevels = () => (store(testLevelsKey()) || []).filter((k) => k !== "auto" && LEARN_LEVELS[k]);
+const testDiffKey = () => `apex-test-diff-${authUser.id}`;
+const testDiffs = () => { const d = (store(testDiffKey()) || []).filter((x) => [1, 2, 3].includes(x)); return d.length ? d : [1, 2, 3]; };
+const levelNames = (list) => list.map((k) => LEARN_LEVELS[k].label).join(", ");
+// Pick topics: the question bank is Year 7, so it's used when Year 7 is the only focus (or nothing is ticked and
+// your level is Year 7 / Any level). Anything else gets an AI-written test.
+const useBank = () => { const lv = testLevels(); return lv.length ? lv.length === 1 && lv[0] === "y7" : bankLevel(); };
+// The level instructions for AI-written test questions.
+function testLevelLine(fallback = "") {
+  const lv = testLevels();
+  if (!lv.length) return learnerLine(fallback);
+  if (lv.length === 1) { const l = LEARN_LEVELS[lv[0]]; return `LEVEL: Write every question for a student ${l.who}, in Victoria, Australia: ${l.how}.`; }
+  return `LEVELS: The student wants a test covering several year levels: ${levelNames(lv)} (Victoria, Australia). Spread the questions evenly across these levels, pitch each question clearly at one of them using the right curriculum for that level, and start each topicName with its level, e.g. "${LEARN_LEVELS[lv[0]].label} – Fractions".`;
+}
+const testDiffLine = () => { const d = testDiffs(); return d.length === 3 ? "DIFFICULTY: mix easier, medium and harder questions." : `DIFFICULTY: only write ${d.map((x) => DIFF_NAMES[x].toLowerCase()).join(" and ")} questions (for the year level), and set each question's difficulty to match (1 = easy, 2 = medium, 3 = hard).`; };
+function testLevelsHTML(note = "") {
+  const on = new Set(testLevels());
+  return `<div class="test-opt">
+    <span class="fb-style-label">🎓 Year levels to focus on</span>
+    <div class="checklist test-levels">${Object.entries(LEARN_LEVELS).filter(([k]) => k !== "auto").map(([k, v]) => `<label class="chip-check"><input type="checkbox" data-test-level value="${k}"${on.has(k) ? " checked" : ""}> ${esc(v.label)}</label>`).join("")}</div>
+    <span class="muted small">${note || "Tick one or more. Leave them all unticked to use your level."} <span data-test-level-now>${testLevelsNow()}</span></span>
+  </div>`;
+}
+const testLevelsNow = () => { const lv = testLevels(); return lv.length ? `Focusing on: <b>${esc(levelNames(lv))}</b>.` : `Using your level: <b>${esc(LEARN_LEVELS[learnLevel()].short || LEARN_LEVELS[learnLevel()].label)}</b>.`; };
+function testDiffHTML() {
+  const on = new Set(testDiffs());
+  return `<div class="test-opt">
+    <span class="fb-style-label">💪 How hard</span>
+    <div class="checklist">${[1, 2, 3].map((d) => `<label class="chip-check"><input type="checkbox" data-test-diff value="${d}"${on.has(d) ? " checked" : ""}> ${DIFF_NAMES[d]}</label>`).join("")}</div>
+  </div>`;
+}
+document.addEventListener("change", (e) => {
+  if (!authUser) return;
+  if (e.target.matches("[data-test-level]")) {
+    const lv = [...new Set($$("[data-test-level]:checked").map((b) => b.value))];
+    store(testLevelsKey(), lv);
+    $$("[data-test-level]").forEach((b) => { b.checked = lv.includes(b.value); });
+    $$("[data-test-level-now]").forEach((el) => { el.innerHTML = testLevelsNow(); });
+  }
+  if (e.target.matches("[data-test-diff]")) {
+    let d = [...new Set($$("[data-test-diff]:checked").map((b) => +b.value))];
+    if (!d.length) { e.target.checked = true; d = [+e.target.value]; toast("Pick at least one difficulty."); }
+    store(testDiffKey(), d);
+    $$("[data-test-diff]").forEach((b) => { b.checked = d.includes(+b.value); });
+  }
+});
+
 function writingFeedbackPrompt(t, piece) {
   const s = piece.settings || {};
   const text = writingText(piece);
@@ -2112,7 +2163,7 @@ function pickBuilder(view, host) {
       <div>
         <label class="field">Difficulty</label>
         <div class="checklist" id="t-diff">
-          ${[1, 2, 3].map((d) => `<label class="chip-check"><input type="checkbox" value="${d}" checked> ${DIFF_NAMES[d]}</label>`).join("")}
+          ${[1, 2, 3].map((d) => `<label class="chip-check"><input type="checkbox" data-test-diff value="${d}"${testDiffs().includes(d) ? " checked" : ""}> ${DIFF_NAMES[d]}</label>`).join("")}
         </div>
       </div>
       </div>
@@ -2133,7 +2184,7 @@ function pickBuilder(view, host) {
           <select id="t-time">${timeOptions(20)}</select>
         </div>
       </div>
-      ${levelPickerHTML("Year 7 or Any level uses the question bank. Pick another level and the AI writes new questions on your topics at that level.")}
+      ${testLevelsHTML("Year 7 on its own uses the question bank. Tick other year levels (or several) and the AI writes new questions on your topics for them.")}
       ${feedbackPickerHTML("How the AI marks written answers and talks about your mistakes.")}
       <div id="t-error" class="error hidden"></div>
       <div class="t-go">
@@ -2181,7 +2232,7 @@ function pickBuilder(view, host) {
     }
 
     // The question bank is Year 7, so for any other level the AI writes the test at that level.
-    const atLevel = !bankLevel();
+    const atLevel = !useBank();
     if (examples || files.length || atLevel) {
       const btn = startBtn;
       btn.disabled = true;
@@ -2250,11 +2301,12 @@ Respond with ONLY a valid JSON array of question objects — no other text, no m
 ${examples}
 """
 ` : "";
-  const lvl = LEARN_LEVELS[learnLevel()];
+  const bank = useBank();
   const prompt = topics
-    ? `You are writing exam questions for a ${bankLevel() ? "Year 7 Australian curriculum" : `${lvl.label} (Victoria, Australia)`} test covering these topics: ${topics.map((t) => t.name).join(", ")}.
-${bankLevel() ? "" : `These topic names come from a Year 7 course, but this test is for a student ${lvl.who}: write questions on the same topic areas pitched at THEIR level (easier or harder than Year 7 as needed), following the right curriculum for that level.
-`}Difficulty level(s) to write at${bankLevel() ? "" : " (relative to that year level)"}: ${diffs.map((d) => DIFF_NAMES[d].toLowerCase()).join("/")}.
+    ? `You are writing exam questions for a ${bank ? "Year 7 Australian curriculum" : "Victorian Curriculum"} test covering these topics: ${topics.map((t) => t.name).join(", ")}.
+${bank ? "" : `These topic names come from a Year 7 course, but write questions on the same topic areas for the year level(s) below (easier or harder than Year 7 as needed), following the right curriculum for each level.
+${testLevelLine("Year 7")}
+`}Difficulty level(s) to write at${bank ? "" : " (relative to the year level)"}: ${diffs.map((d) => DIFF_NAMES[d].toLowerCase()).join("/")}.
 
 ${examplesBlock}${hasFiles ? "Also use the student's uploaded files (above): base questions on their content where it fits these topics, and copy the style of any questions in them.\n" : ""}
 Write exactly ${count} new original questions${examples || hasFiles ? " in that same style" : " with a good mix of question types"}, spread across the topics listed above and matching the requested difficulty level(s). Set topicName to whichever listed topic each question belongs to.
@@ -2262,11 +2314,14 @@ Write exactly ${count} new original questions${examples || hasFiles ? " in that 
 ${rules}`
     : `You are writing exam questions based on ${hasFiles ? `the student's uploaded files (above)${examples ? " and these example questions" : ""}` : "example questions a student has given you"}.
 ${examplesBlock}
-${learnLevel() === "auto"
+${testLevels().length ? `First, work out what subject/topic this material covers. Then write questions on it for the chosen year level(s).
+${testLevelLine()}
+
+Then write exactly ${count} new original questions on that same subject.` : learnLevel() === "auto"
     ? `First, work out what subject/topic this material covers and what level it is pitched at — judge this from the material itself, not from any assumed year level, and match that same level.
 
 Then write exactly ${count} new original questions on that same subject, at that same level.`
-    : `First, work out what subject/topic this material covers. The student has chosen their year level: they are ${lvl.who}. Pitch the questions at that level.
+    : `First, work out what subject/topic this material covers. The student has chosen their year level: they are ${LEARN_LEVELS[learnLevel()].who}. Pitch the questions at that level.
 
 Then write exactly ${count} new original questions on that same subject, at that level.`} If the material contains questions (a worksheet, test or textbook exercise), write NEW questions in a similar style and format — don't copy them. If it's notes or a textbook page, test the key facts and ideas in it. Set topicName to the subject you identified, and difficulty to 1 (easier than the material), 2 (about the same) or 3 (harder).
 

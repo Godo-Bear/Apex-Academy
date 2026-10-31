@@ -1276,3 +1276,7 @@ body::before {
 :root[data-theme="dark"] .q-style-problemsolving { background: #1F3346; color: #9CC8F0; }
 :root[data-theme="dark"] .q-style-reasoning { background: #2E2742; color: #C6B4F2; }
 :root[data-theme="dark"] .q-style-enrichment { background: #3A2E1C; color: #F2C78A; }
+
+/* Test options (year levels and difficulty) */
+.test-opt { display: flex; flex-direction: column; gap: 8px; }
+.test-levels .chip-check { padding: 6px 10px; font-size: 13px; }
